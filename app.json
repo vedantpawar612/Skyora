@@ -1,29 +1,46 @@
 {
   "expo": {
-    "name": "yoga",
-    "slug": "yoga",
+    "name": "Skyora",
+    "slug": "skyora",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "icon": "./assets/skyora.png",
+    "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/skyora.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0A0E21"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.skyora.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Skyora needs camera access to detect your yoga poses and provide real-time feedback.",
+        "NSSpeechRecognitionUsageDescription": "Skyora uses speech to provide voice guided feedback."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+        "backgroundColor": "#0A0E21",
+        "foregroundImage": "./assets/skyora.png"
+      },
+      "package": "com.skyora.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Skyora needs camera access to detect your yoga poses."
+        }
+      ],
+      "expo-font"
+    ]
   }
 }
