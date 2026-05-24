@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "Skyora",
+    "slug": "skyora",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/skyora.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/skyora.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0E21"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.skyora.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Skyora needs camera access to detect your yoga poses and provide real-time feedback.",
+        "NSSpeechRecognitionUsageDescription": "Skyora uses speech to provide voice guided feedback."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0E21",
+        "foregroundImage": "./assets/skyora.png"
+      },
+      "package": "com.skyora.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24,
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 34,
+            "kotlinVersion": "2.1.0"
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ],
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "6e4c0dff-623b-4d0a-a44a-c07839b544a0"
+      }
+    }
+  }
+}

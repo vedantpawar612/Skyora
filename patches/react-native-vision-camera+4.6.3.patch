@@ -1,0 +1,39 @@
+diff --git a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/core/CameraSession.kt b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/core/CameraSession.kt
+index 0000000..1111111 100644
+--- a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/core/CameraSession.kt
++++ b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/core/CameraSession.kt
+@@ -90,7 +90,7 @@ class CameraSession(internal val context: Context, internal val callback: Callba
+     }
+   }
+ 
+-  override fun getLifecycle(): Lifecycle = lifecycleRegistry
++  override val lifecycle: Lifecycle get() = lifecycleRegistry
+ 
+   /**
+    * Configures the [CameraSession] with new values in one batch.
+diff --git a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraViewManager.kt b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraViewManager.kt
+index 0000000..1111111 100644
+--- a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraViewManager.kt
++++ b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraViewManager.kt
+@@ -41,7 +41,7 @@ class CameraViewManager : ViewGroupManager<CameraView>() {
+       .put(CameraOutputOrientationChangedEvent.EVENT_NAME, MapBuilder.of("registrationName", "onOutputOrientationChanged"))
+       .put(CameraPreviewOrientationChangedEvent.EVENT_NAME, MapBuilder.of("registrationName", "onPreviewOrientationChanged"))
+       .put(AverageFpsChangedEvent.EVENT_NAME, MapBuilder.of("registrationName", "onAverageFpsChanged"))
+-      .build()
++      .build().toMutableMap()
+ 
+   override fun getName(): String = TAG
+ 
+diff --git a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraViewModule.kt b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraViewModule.kt
+index 0000000..1111111 100644
+--- a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraViewModule.kt
++++ b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraViewModule.kt
+@@ -188,7 +188,7 @@ class CameraViewModule(reactContext: ReactApplicationContext) : ReactContextBase
+   }
+ 
+   private fun canRequestPermission(permission: String): Boolean {
+-    val activity = currentActivity as? PermissionAwareActivity
++    val activity = reactApplicationContext.currentActivity as? PermissionAwareActivity
+     return activity?.shouldShowRequestPermissionRationale(permission) ?: false
+   }
+ 
