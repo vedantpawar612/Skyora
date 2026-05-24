@@ -29,6 +29,17 @@ import { calculateAllAngles } from '../services/angleCalculator';
 import ttsService from '../services/ttsService';
 import { generateSessionId } from '../utils/helpers';
 
+// ── Stable config created ONCE at module level ──
+// This prevents the usePoseDetection hook from tearing down and
+// recreating the native MediaPipe detector on every component render.
+const STABLE_POSE_CONFIG = getPoseDetectionConfig({
+  delegate: Delegate.GPU,
+  fpsMode: 10,
+});
+const STABLE_RUNNING_MODE = STABLE_POSE_CONFIG.runningMode;
+const STABLE_MODEL = STABLE_POSE_CONFIG.model;
+const STABLE_OPTIONS = STABLE_POSE_CONFIG.options;
+
 const { width, height } = Dimensions.get('window');
 
 const CameraSessionScreen = ({ route, navigation }) => {
@@ -55,49 +66,58 @@ const CameraSessionScreen = ({ route, navigation }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const sessionId = useRef(generateSessionId());
   const isSessionActiveRef = useRef(false);
+  const ttsEnabledRef = useRef(ttsEnabled);
+  const targetAnglesRef = useRef(pose.targetAngles);
 
-  // Get pose detection configuration
-  const poseConfig = useMemo(() => getPoseDetectionConfig({
-    delegate: Delegate.GPU,
-    fpsMode: 10,
-  }), []);
+  // Keep refs in sync with state so the stable callback can read latest values
+  useEffect(() => { ttsEnabledRef.current = ttsEnabled; }, [ttsEnabled]);
+  useEffect(() => { targetAnglesRef.current = pose.targetAngles; }, [pose.targetAngles]);
 
-  // MediaPipe pose detection callbacks
+  // ── Stable callbacks using refs (never changes reference) ──
+  // This is critical: if the callbacks object changes, usePoseDetection
+  // will re-register event listeners which can cause the detector to
+  // be torn down. By using refs, the callback reference stays stable
+  // while always reading the latest state.
   const poseCallbacks = useMemo(() => ({
     onResults: (results, viewCoordinator) => {
-      // Only process if session is active
-      if (!isSessionActiveRef.current) return;
-
-      const processed = processPoseResults(results, viewCoordinator, pose.targetAngles);
+      // Process results even before session starts so we can
+      // confirm the pipeline works (landmarks will be set but
+      // overlay only renders when isSessionActive is true).
+      const processed = processPoseResults(results, viewCoordinator, targetAnglesRef.current);
 
       if (processed) {
         setLandmarks(processed.landmarks);
         setComparison(processed.comparison);
         setAccuracy(processed.comparison?.overallAccuracy || 0);
-        accuracyHistory.current.push(processed.comparison?.overallAccuracy || 0);
 
-        // Voice feedback
-        if (ttsEnabled && processed.comparison?.primaryFeedback) {
-          ttsService.speak(processed.comparison.primaryFeedback);
+        // Only record history and speak during active session
+        if (isSessionActiveRef.current) {
+          accuracyHistory.current.push(processed.comparison?.overallAccuracy || 0);
+
+          // Voice feedback
+          if (ttsEnabledRef.current && processed.comparison?.primaryFeedback) {
+            ttsService.speak(processed.comparison.primaryFeedback);
+          }
         }
       }
     },
     onError: (error) => {
-      console.warn('Pose detection error:', error);
+      console.warn('[CameraSession] Pose detection error:', error);
     },
-  }), [pose.targetAngles, ttsEnabled]);
+  }), []); // Empty deps — uses refs for latest values
 
-  // Initialize MediaPipe pose detection hook
+  // Initialize MediaPipe pose detection hook with STABLE references
   const poseDetection = usePoseDetection(
     poseCallbacks,
-    poseConfig.runningMode,
-    poseConfig.model,
-    poseConfig.options,
+    STABLE_RUNNING_MODE,
+    STABLE_MODEL,
+    STABLE_OPTIONS,
   );
 
   // Track model readiness
   useEffect(() => {
     if (poseDetection.frameProcessor) {
+      console.log('[CameraSession] Frame processor ready — model loaded');
       setIsModelReady(true);
     }
   }, [poseDetection.frameProcessor]);
@@ -265,6 +285,16 @@ const CameraSessionScreen = ({ route, navigation }) => {
         onOutputOrientationChanged={poseDetection.cameraOrientationChangedHandler}
         onInitialized={() => console.log('Camera initialized')}
       >
+        {/* Skeleton preview before session (semi-transparent to confirm detection) */}
+        {!isSessionActive && landmarks && (
+          <View style={{ opacity: 0.4 }} pointerEvents="none">
+            <SkeletonOverlay
+              landmarks={landmarks}
+              width={width} height={height}
+            />
+          </View>
+        )}
+
         {/* Skeleton overlay drawn on top of camera feed */}
         {isSessionActive && landmarks && (
           <SkeletonOverlay
