@@ -15,7 +15,7 @@
 //   1. angleCalculator uses direction vectors (scale-invariant)
 //   2. SkeletonOverlay already handles normalized→screen conversion
 
-import { usePoseDetection, KnownPoseLandmarks } from 'react-native-mediapipe';
+import { usePoseDetection, KnownPoseLandmarks, MediapipeCamera } from 'react-native-mediapipe';
 import { RunningMode, Delegate } from 'react-native-mediapipe';
 import { calculateAllAngles, LANDMARK_INDICES, SKELETON_CONNECTIONS } from './angleCalculator';
 import { comparePose } from './poseComparisonService';
@@ -197,6 +197,7 @@ export {
   RunningMode,
   Delegate,
   KnownPoseLandmarks,
+  MediapipeCamera,
   LANDMARK_INDICES,
   SKELETON_CONNECTIONS,
 };

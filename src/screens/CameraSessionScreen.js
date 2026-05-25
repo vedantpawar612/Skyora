@@ -7,8 +7,6 @@ import {
   Dimensions, Animated, Platform,
 } from 'react-native';
 import {
-  Camera,
-  useCameraDevice,
   useCameraPermission,
 } from 'react-native-vision-camera';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,9 +21,8 @@ import {
   Delegate,
   processPoseResults,
   getPoseDetectionConfig,
+  MediapipeCamera,
 } from '../services/poseDetectionService';
-import { comparePose } from '../services/poseComparisonService';
-import { calculateAllAngles } from '../services/angleCalculator';
 import ttsService from '../services/ttsService';
 import { generateSessionId } from '../utils/helpers';
 
@@ -45,8 +42,7 @@ const { width, height } = Dimensions.get('window');
 const CameraSessionScreen = ({ route, navigation }) => {
   const { pose } = route.params;
 
-  // Vision Camera setup
-  const device = useCameraDevice('front');
+  // Camera permission
   const { hasPermission, requestPermission } = useCameraPermission();
 
   // Session state
@@ -68,24 +64,29 @@ const CameraSessionScreen = ({ route, navigation }) => {
   const isSessionActiveRef = useRef(false);
   const ttsEnabledRef = useRef(ttsEnabled);
   const targetAnglesRef = useRef(pose.targetAngles);
+  const resultCountRef = useRef(0);
 
-  // Keep refs in sync with state so the stable callback can read latest values
+  // Keep refs in sync with state
   useEffect(() => { ttsEnabledRef.current = ttsEnabled; }, [ttsEnabled]);
   useEffect(() => { targetAnglesRef.current = pose.targetAngles; }, [pose.targetAngles]);
 
   // ── Stable callbacks using refs (never changes reference) ──
-  // This is critical: if the callbacks object changes, usePoseDetection
-  // will re-register event listeners which can cause the detector to
-  // be torn down. By using refs, the callback reference stays stable
-  // while always reading the latest state.
   const poseCallbacks = useMemo(() => ({
     onResults: (results, viewCoordinator) => {
-      // Process results even before session starts so we can
-      // confirm the pipeline works (landmarks will be set but
-      // overlay only renders when isSessionActive is true).
+      resultCountRef.current += 1;
+
+      // Log first few results for debugging
+      if (resultCountRef.current <= 3) {
+        console.log(`[CameraSession] onResults #${resultCountRef.current}, keys:`, Object.keys(results));
+      }
+
       const processed = processPoseResults(results, viewCoordinator, targetAnglesRef.current);
 
       if (processed) {
+        if (resultCountRef.current <= 3) {
+          console.log(`[CameraSession] Pose processed! landmarks: ${processed.landmarks.length}, accuracy: ${processed.comparison?.overallAccuracy}%`);
+        }
+
         setLandmarks(processed.landmarks);
         setComparison(processed.comparison);
         setAccuracy(processed.comparison?.overallAccuracy || 0);
@@ -94,10 +95,13 @@ const CameraSessionScreen = ({ route, navigation }) => {
         if (isSessionActiveRef.current) {
           accuracyHistory.current.push(processed.comparison?.overallAccuracy || 0);
 
-          // Voice feedback
           if (ttsEnabledRef.current && processed.comparison?.primaryFeedback) {
             ttsService.speak(processed.comparison.primaryFeedback);
           }
+        }
+      } else {
+        if (resultCountRef.current <= 5) {
+          console.log(`[CameraSession] onResults #${resultCountRef.current}: processPoseResults returned null`);
         }
       }
     },
@@ -114,15 +118,17 @@ const CameraSessionScreen = ({ route, navigation }) => {
     STABLE_OPTIONS,
   );
 
-  // Track model readiness
+  // Track model readiness — the frame processor exists even before
+  // the detector handle is set, so we also log to confirm
   useEffect(() => {
     if (poseDetection.frameProcessor) {
-      console.log('[CameraSession] Frame processor ready — model loaded');
+      console.log('[CameraSession] Frame processor available');
       setIsModelReady(true);
     }
   }, [poseDetection.frameProcessor]);
 
   useEffect(() => {
+    console.log('[CameraSession] Component MOUNTED');
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 500,
@@ -130,6 +136,7 @@ const CameraSessionScreen = ({ route, navigation }) => {
     }).start();
 
     return () => {
+      console.log('[CameraSession] Component UNMOUNTING');
       stopSession();
       ttsService.dispose();
     };
@@ -141,6 +148,7 @@ const CameraSessionScreen = ({ route, navigation }) => {
     setSessionDuration(0);
     setSessionComplete(false);
     accuracyHistory.current = [];
+    resultCountRef.current = 0; // Reset result counter
 
     ttsService.speakSessionStart(pose.name);
 
@@ -170,22 +178,6 @@ const CameraSessionScreen = ({ route, navigation }) => {
     const enabled = ttsService.toggle();
     setTtsEnabled(enabled);
   };
-
-  // No camera device available
-  if (!device) {
-    return (
-      <View style={styles.container}>
-        <LinearGradient colors={[COLORS.background, COLORS.backgroundLight]} style={styles.gradient}>
-          <Ionicons name="camera-off-outline" size={64} color={COLORS.error} />
-          <Text style={styles.permissionTitle}>No Camera Found</Text>
-          <Text style={styles.permissionText}>
-            Could not find a front-facing camera on this device.
-          </Text>
-          <GradientButton title="Go Back" onPress={() => navigation.goBack()} style={{ marginTop: SPACING.lg }} />
-        </LinearGradient>
-      </View>
-    );
-  }
 
   // Permission not granted
   if (!hasPermission) {
@@ -272,102 +264,102 @@ const CameraSessionScreen = ({ route, navigation }) => {
   }
 
   // Main camera session view
+  // Uses MediapipeCamera which properly handles the camera-detector
+  // lifecycle (device changes, orientation, frame processor binding)
   return (
     <View style={styles.container}>
       <StatusBar hidden />
-      <Camera
-        style={styles.camera}
-        device={device}
-        isActive={true}
-        frameProcessor={poseDetection.frameProcessor}
-        pixelFormat="rgb"
-        onLayout={poseDetection.cameraViewLayoutChangeHandler}
-        onOutputOrientationChanged={poseDetection.cameraOrientationChangedHandler}
-        onInitialized={() => console.log('Camera initialized')}
-      >
-        {/* Skeleton preview before session (semi-transparent to confirm detection) */}
-        {!isSessionActive && landmarks && (
-          <View style={{ opacity: 0.4 }} pointerEvents="none">
-            <SkeletonOverlay
-              landmarks={landmarks}
-              width={width} height={height}
-            />
-          </View>
-        )}
 
-        {/* Skeleton overlay drawn on top of camera feed */}
-        {isSessionActive && landmarks && (
+      {/* Camera rendered by the library's component */}
+      <MediapipeCamera
+        style={styles.camera}
+        solution={poseDetection}
+        activeCamera="front"
+        resizeMode="cover"
+      />
+
+      {/* Skeleton preview before session (semi-transparent to confirm detection) */}
+      {!isSessionActive && landmarks && (
+        <View style={[StyleSheet.absoluteFill, { opacity: 0.4 }]} pointerEvents="none">
           <SkeletonOverlay
             landmarks={landmarks}
-            jointResults={comparison?.jointResults}
             width={width} height={height}
-            showAngles={showAngles}
           />
-        )}
+        </View>
+      )}
 
-        {/* Feedback overlay showing accuracy and instructions */}
-        {isSessionActive && comparison && (
-          <FeedbackOverlay
-            accuracy={accuracy}
-            primaryFeedback={comparison.primaryFeedback}
-            feedback={comparison.feedback}
-            duration={sessionDuration}
-            poseName={pose.name}
-          />
-        )}
+      {/* Skeleton overlay drawn on top of camera feed */}
+      {isSessionActive && landmarks && (
+        <SkeletonOverlay
+          landmarks={landmarks}
+          jointResults={comparison?.jointResults}
+          width={width} height={height}
+          showAngles={showAngles}
+        />
+      )}
 
-        {/* Pre-session overlay — shown before starting */}
-        {!isSessionActive && (
-          <View style={styles.preSessionOverlay}>
-            <View style={styles.preTopBar}>
-              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.navBtn}>
-                <Ionicons name="arrow-back" size={24} color="#FFF" />
-              </TouchableOpacity>
-              <Text style={styles.preTitle}>{pose.name}</Text>
-              <View style={{ width: 40 }} />
-            </View>
-            <View style={styles.preCenterContent}>
-              <View style={styles.preInstructionBox}>
-                <Ionicons name="body" size={40} color={COLORS.primary} />
-                <Text style={styles.preInstructionTitle}>
-                  {isModelReady ? 'Position Yourself' : 'Loading AI Model...'}
-                </Text>
-                <Text style={styles.preInstructionText}>
-                  {isModelReady
-                    ? `Stand in view of the camera.\nMake sure your full body is visible.`
-                    : 'MediaPipe pose detection model is initializing.\nThis may take a few seconds.'
-                  }
-                </Text>
-              </View>
-              <GradientButton
-                title={isModelReady ? 'Start Practice' : 'Loading...'}
-                onPress={startSession}
-                size="large"
-                disabled={!isModelReady}
-                icon={<Ionicons name={isModelReady ? 'play' : 'hourglass'} size={20} color="#FFF" />}
-                style={styles.startBtn}
-              />
-            </View>
+      {/* Feedback overlay showing accuracy and instructions */}
+      {isSessionActive && comparison && (
+        <FeedbackOverlay
+          accuracy={accuracy}
+          primaryFeedback={comparison.primaryFeedback}
+          feedback={comparison.feedback}
+          duration={sessionDuration}
+          poseName={pose.name}
+        />
+      )}
+
+      {/* Pre-session overlay — shown before starting */}
+      {!isSessionActive && (
+        <View style={styles.preSessionOverlay}>
+          <View style={styles.preTopBar}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.navBtn}>
+              <Ionicons name="arrow-back" size={24} color="#FFF" />
+            </TouchableOpacity>
+            <Text style={styles.preTitle}>{pose.name}</Text>
+            <View style={{ width: 40 }} />
           </View>
-        )}
-
-        {/* Session controls — shown during active session */}
-        {isSessionActive && (
-          <View style={styles.sessionControls}>
-            <TouchableOpacity onPress={toggleTTS} style={styles.controlBtn}>
-              <Ionicons name={ttsEnabled ? 'volume-high' : 'volume-mute'} size={22}
-                color={ttsEnabled ? COLORS.accent : COLORS.textMuted} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowAngles(!showAngles)} style={styles.controlBtn}>
-              <Ionicons name="analytics" size={22}
-                color={showAngles ? COLORS.accent : COLORS.textMuted} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={endSession} style={[styles.controlBtn, styles.endBtn]}>
-              <Ionicons name="stop" size={22} color={COLORS.error} />
-            </TouchableOpacity>
+          <View style={styles.preCenterContent}>
+            <View style={styles.preInstructionBox}>
+              <Ionicons name="body" size={40} color={COLORS.primary} />
+              <Text style={styles.preInstructionTitle}>
+                {isModelReady ? 'Position Yourself' : 'Loading AI Model...'}
+              </Text>
+              <Text style={styles.preInstructionText}>
+                {isModelReady
+                  ? `Stand in view of the camera.\nMake sure your full body is visible.`
+                  : 'MediaPipe pose detection model is initializing.\nThis may take a few seconds.'
+                }
+              </Text>
+            </View>
+            <GradientButton
+              title={isModelReady ? 'Start Practice' : 'Loading...'}
+              onPress={startSession}
+              size="large"
+              disabled={!isModelReady}
+              icon={<Ionicons name={isModelReady ? 'play' : 'hourglass'} size={20} color="#FFF" />}
+              style={styles.startBtn}
+            />
           </View>
-        )}
-      </Camera>
+        </View>
+      )}
+
+      {/* Session controls — shown during active session */}
+      {isSessionActive && (
+        <View style={styles.sessionControls}>
+          <TouchableOpacity onPress={toggleTTS} style={styles.controlBtn}>
+            <Ionicons name={ttsEnabled ? 'volume-high' : 'volume-mute'} size={22}
+              color={ttsEnabled ? COLORS.accent : COLORS.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowAngles(!showAngles)} style={styles.controlBtn}>
+            <Ionicons name="analytics" size={22}
+              color={showAngles ? COLORS.accent : COLORS.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={endSession} style={[styles.controlBtn, styles.endBtn]}>
+            <Ionicons name="stop" size={22} color={COLORS.error} />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
