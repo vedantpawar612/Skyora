@@ -30,7 +30,7 @@ import { generateSessionId } from '../utils/helpers';
 // This prevents the usePoseDetection hook from tearing down and
 // recreating the native MediaPipe detector on every component render.
 const STABLE_POSE_CONFIG = getPoseDetectionConfig({
-  delegate: Delegate.GPU,
+  delegate: Delegate.CPU,
   fpsMode: 10,
 });
 const STABLE_RUNNING_MODE = STABLE_POSE_CONFIG.runningMode;

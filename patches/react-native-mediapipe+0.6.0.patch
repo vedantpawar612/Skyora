@@ -1,0 +1,91 @@
+diff --git a/node_modules/react-native-mediapipe/lib/commonjs/poseDetection/index.js b/node_modules/react-native-mediapipe/lib/commonjs/poseDetection/index.js
+index 8ed614f..0886b02 100644
+--- a/node_modules/react-native-mediapipe/lib/commonjs/poseDetection/index.js
++++ b/node_modules/react-native-mediapipe/lib/commonjs/poseDetection/index.js
+@@ -94,17 +94,36 @@ function usePoseDetection(callbacks, runningMode, model, options) {
+   }, [updateDetectorMap]);
+   _react.default.useEffect(() => {
+     let newHandle;
+-    console.log(`getPoseDetectionModule: delegate = ${options?.delegate}, runningMode = ${runningMode}, model= ${model}`);
++    let isMounted = true;
++    console.log(`[PoseDetection-PATCHED] createDetector starting: delegate=${options?.delegate}, runningMode=${runningMode}, model=${model}`);
+     getPoseDetectionModule().createDetector(options?.numPoses ?? 1, options?.minPoseDetectionConfidence ?? 0.5, options?.minPosePresenceConfidence ?? 0.5, options?.minTrackingConfidence ?? 0.5, options?.shouldOutputSegmentationMasks ?? false, model, options?.delegate ?? _types.Delegate.GPU, runningMode).then(handle => {
+-      console.log("usePoseDetection.createDetector", runningMode, model, handle);
+-      setDetectorHandle(handle);
++      console.log("[PoseDetection-PATCHED] createDetector resolved, handle=", handle, "isMounted=", isMounted);
++      if (!isMounted) {
++        console.log("[PoseDetection-PATCHED] Component unmounted during createDetector, releasing handle", handle);
++        getPoseDetectionModule().releaseDetector(handle);
++        return;
++      }
+       newHandle = handle;
++      // EAGERLY register in detectorMap so onResults events are not dropped
++      // while waiting for React state update cycle
++      const eagleVC = new _convert.BaseViewCoordinator(
++        { width: 1, height: 1 }, false, "portrait", "portrait", "cover"
++      );
++      detectorMap.set(handle, {
++        onResults: callbacks.onResults,
++        onError: callbacks.onError,
++        viewCoordinator: eagleVC
++      });
++      console.log("[PoseDetection-PATCHED] Eagerly registered handle", handle, "in detectorMap, size=", detectorMap.size);
++      setDetectorHandle(handle);
+     }).catch(e => {
+-      console.error(`Failed to create detector: ${e}`);
++      console.error(`[PoseDetection-PATCHED] Failed to create detector: ${e}`);
+     });
+     return () => {
+-      console.log("usePoseDetection.useEffect.unsub", "releaseDetector", newHandle);
++      isMounted = false;
++      console.log("[PoseDetection-PATCHED] cleanup called, newHandle=", newHandle);
+       if (newHandle !== undefined) {
++        detectorMap.delete(newHandle);
+         getPoseDetectionModule().releaseDetector(newHandle);
+       }
+     };
+diff --git a/node_modules/react-native-mediapipe/lib/module/poseDetection/index.js b/node_modules/react-native-mediapipe/lib/module/poseDetection/index.js
+index e32b6e5..8bf5c23 100644
+--- a/node_modules/react-native-mediapipe/lib/module/poseDetection/index.js
++++ b/node_modules/react-native-mediapipe/lib/module/poseDetection/index.js
+@@ -85,17 +85,35 @@ export function usePoseDetection(callbacks, runningMode, model, options) {
+   }, [updateDetectorMap]);
+   React.useEffect(() => {
+     let newHandle;
+-    console.log(`getPoseDetectionModule: delegate = ${options?.delegate}, runningMode = ${runningMode}, model= ${model}`);
++    let isMounted = true;
++    console.log(`[PoseDetection-PATCHED] createDetector starting: delegate=${options?.delegate}, runningMode=${runningMode}, model=${model}`);
+     getPoseDetectionModule().createDetector(options?.numPoses ?? 1, options?.minPoseDetectionConfidence ?? 0.5, options?.minPosePresenceConfidence ?? 0.5, options?.minTrackingConfidence ?? 0.5, options?.shouldOutputSegmentationMasks ?? false, model, options?.delegate ?? Delegate.GPU, runningMode).then(handle => {
+-      console.log("usePoseDetection.createDetector", runningMode, model, handle);
+-      setDetectorHandle(handle);
++      console.log("[PoseDetection-PATCHED] createDetector resolved, handle=", handle, "isMounted=", isMounted);
++      if (!isMounted) {
++        console.log("[PoseDetection-PATCHED] Component unmounted during createDetector, releasing handle", handle);
++        getPoseDetectionModule().releaseDetector(handle);
++        return;
++      }
+       newHandle = handle;
++      // EAGERLY register in detectorMap so onResults events are not dropped
++      const eagleVC = new BaseViewCoordinator(
++        { width: 1, height: 1 }, false, "portrait", "portrait", "cover"
++      );
++      detectorMap.set(handle, {
++        onResults: callbacks.onResults,
++        onError: callbacks.onError,
++        viewCoordinator: eagleVC
++      });
++      console.log("[PoseDetection-PATCHED] Eagerly registered handle", handle, "in detectorMap, size=", detectorMap.size);
++      setDetectorHandle(handle);
+     }).catch(e => {
+-      console.error(`Failed to create detector: ${e}`);
++      console.error(`[PoseDetection-PATCHED] Failed to create detector: ${e}`);
+     });
+     return () => {
+-      console.log("usePoseDetection.useEffect.unsub", "releaseDetector", newHandle);
++      isMounted = false;
++      console.log("[PoseDetection-PATCHED] cleanup called, newHandle=", newHandle);
+       if (newHandle !== undefined) {
++        detectorMap.delete(newHandle);
+         getPoseDetectionModule().releaseDetector(newHandle);
+       }
+     };
