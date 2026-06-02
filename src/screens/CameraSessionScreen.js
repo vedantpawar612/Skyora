@@ -56,6 +56,7 @@ const CameraSessionScreen = ({ route, navigation }) => {
   const [sessionComplete, setSessionComplete] = useState(false);
   const [finalAccuracy, setFinalAccuracy] = useState(0);
   const [isModelReady, setIsModelReady] = useState(false);
+  const [poseError, setPoseError] = useState(null);
 
   const timerRef = useRef(null);
   const accuracyHistory = useRef([]);
@@ -107,6 +108,7 @@ const CameraSessionScreen = ({ route, navigation }) => {
     },
     onError: (error) => {
       console.warn('[CameraSession] Pose detection error:', error);
+      setPoseError(typeof error === 'string' ? error : error?.message || JSON.stringify(error));
     },
   }), []); // Empty deps — uses refs for latest values
 
@@ -321,23 +323,25 @@ const CameraSessionScreen = ({ route, navigation }) => {
           </View>
           <View style={styles.preCenterContent}>
             <View style={styles.preInstructionBox}>
-              <Ionicons name="body" size={40} color={COLORS.primary} />
+              <Ionicons name={poseError ? 'warning' : 'body'} size={40} color={poseError ? COLORS.error || '#FF5252' : COLORS.primary} />
               <Text style={styles.preInstructionTitle}>
-                {isModelReady ? 'Position Yourself' : 'Loading AI Model...'}
+                {poseError ? 'AI Model Error' : isModelReady ? 'Position Yourself' : 'Loading AI Model...'}
               </Text>
               <Text style={styles.preInstructionText}>
-                {isModelReady
+                {poseError
+                  ? `Error: ${poseError}\n\nPlease restart the app or check if the model file is bundled correctly.`
+                  : isModelReady
                   ? `Stand in view of the camera.\nMake sure your full body is visible.`
                   : 'MediaPipe pose detection model is initializing.\nThis may take a few seconds.'
                 }
               </Text>
             </View>
             <GradientButton
-              title={isModelReady ? 'Start Practice' : 'Loading...'}
-              onPress={startSession}
+              title={isModelReady ? 'Start Practice' : poseError ? 'Error — Retry' : 'Loading...'}
+              onPress={poseError ? () => { setPoseError(null); } : startSession}
               size="large"
-              disabled={!isModelReady}
-              icon={<Ionicons name={isModelReady ? 'play' : 'hourglass'} size={20} color="#FFF" />}
+              disabled={!isModelReady && !poseError}
+              icon={<Ionicons name={isModelReady ? 'play' : poseError ? 'refresh' : 'hourglass'} size={20} color="#FFF" />}
               style={styles.startBtn}
             />
           </View>
