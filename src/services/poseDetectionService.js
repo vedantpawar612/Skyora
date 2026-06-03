@@ -17,6 +17,7 @@
 
 import { usePoseDetection, KnownPoseLandmarks, MediapipeCamera } from 'react-native-mediapipe';
 import { RunningMode, Delegate } from 'react-native-mediapipe';
+import { Platform } from 'react-native';
 import { calculateAllAngles, LANDMARK_INDICES, SKELETON_CONNECTIONS } from './angleCalculator';
 import { comparePose } from './poseComparisonService';
 
@@ -140,15 +141,40 @@ export function processPoseResults(results, viewCoordinator, targetAngles) {
     return null;
   }
 
-  // Keep landmarks in normalized [0..1] space
-  // Each landmark has {x, y, z, visibility?} where x,y are in [0..1]
-  // This is the same format the existing SkeletonOverlay and angleCalculator expect
-  const landmarks = rawLandmarks.map((lm) => ({
-    x: lm.x,
-    y: lm.y,
-    z: lm.z || 0,
-    visibility: lm.visibility ?? 0.99,
-  }));
+  // ── Orientation correction ──
+  // On Android, the camera sensor is physically landscape-mounted.
+  // MediaPipe returns landmarks in the sensor's coordinate space, so when
+  // the phone is held in portrait mode the landmarks are rotated 90°.
+  //
+  // The fix: rotate normalized coordinates by 90° clockwise:
+  //   new_x = landmark.y
+  //   new_y = 1 - landmark.x
+  //
+  // This brings them into portrait-aligned [0..1] space that our
+  // SkeletonOverlay (which draws with screen width/height) expects.
+  //
+  // Note: angle calculations (direction vectors) are scale/rotation-invariant
+  // for mirror operations, but the 90° rotation swaps axes which changes
+  // angles. We must rotate BEFORE calculating angles so the joint angles
+  // match the user's actual body orientation on screen.
+  const isAndroid = Platform.OS === 'android';
+
+  const landmarks = rawLandmarks.map((lm) => {
+    if (isAndroid) {
+      return {
+        x: lm.y,
+        y: 1 - lm.x,
+        z: lm.z || 0,
+        visibility: lm.visibility ?? 0.99,
+      };
+    }
+    return {
+      x: lm.x,
+      y: lm.y,
+      z: lm.z || 0,
+      visibility: lm.visibility ?? 0.99,
+    };
+  });
 
   // Calculate joint angles from detected landmarks
   const angles = calculateAllAngles(landmarks);
