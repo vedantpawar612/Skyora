@@ -20,10 +20,14 @@ import { RunningMode, Delegate } from 'react-native-mediapipe';
 import { Platform } from 'react-native';
 import { calculateAllAngles, LANDMARK_INDICES, SKELETON_CONNECTIONS } from './angleCalculator';
 import { comparePose } from './poseComparisonService';
+import LandmarkSmoother from './landmarkSmoother';
 
 // Path to the bundled MediaPipe model asset
 // This references the .task file placed in assets/models/
 const POSE_MODEL_ASSET = 'pose_landmarker_full.task';
+
+// Singleton landmark smoother for the detection pipeline
+const landmarkSmoother = new LandmarkSmoother(0.4);
 
 // Throttle debug logging so we don't flood the console
 let _lastLogTime = 0;
@@ -132,70 +136,60 @@ function extractLandmarks(results) {
  * @param {Object} results - Raw results from usePoseDetection onResults callback
  * @param {Object} viewCoordinator - View coordinator (unused — we keep normalized coords)
  * @param {Object} targetAngles - The ideal pose angles to compare against
+ * @param {Object} [jointWeights] - Optional per-joint importance weights
  * @returns {Object|null} Processed result with landmarks, angles, and comparison
  */
-export function processPoseResults(results, viewCoordinator, targetAngles) {
+export function processPoseResults(results, viewCoordinator, targetAngles, jointWeights = null, tolerances = null) {
   const rawLandmarks = extractLandmarks(results);
 
   if (!rawLandmarks) {
     return null;
   }
 
-  // ── Orientation correction ──
-  // On Android, the camera sensor is physically landscape-mounted.
-  // MediaPipe returns landmarks in the sensor's coordinate space, so when
-  // the phone is held in portrait mode the landmarks are rotated 90°.
-  //
-  // The fix: rotate normalized coordinates by 90° clockwise:
-  //   new_x = landmark.y
-  //   new_y = 1 - landmark.x
-  //
-  // This brings them into portrait-aligned [0..1] space that our
-  // SkeletonOverlay (which draws with screen width/height) expects.
-  //
-  // Note: angle calculations (direction vectors) are scale/rotation-invariant
-  // for mirror operations, but the 90° rotation swaps axes which changes
-  // angles. We must rotate BEFORE calculating angles so the joint angles
-  // match the user's actual body orientation on screen.
-  const isAndroid = Platform.OS === 'android';
+  // NOTE: forceOutputOrientation: 'portrait' in the detection options
+  // already handles the Android sensor rotation at the native level.
+  // We do NOT apply an additional JS-side rotation, as that would
+  // double-correct and place landmarks off-screen.
+  const landmarks = rawLandmarks.map((lm) => ({
+    x: lm.x,
+    y: lm.y,
+    z: lm.z || 0,
+    visibility: lm.visibility ?? 0.99,
+  }));
 
-  const landmarks = rawLandmarks.map((lm) => {
-    if (isAndroid) {
-      return {
-        x: lm.y,
-        y: 1 - lm.x,
-        z: lm.z || 0,
-        visibility: lm.visibility ?? 0.99,
-      };
-    }
-    return {
-      x: lm.x,
-      y: lm.y,
-      z: lm.z || 0,
-      visibility: lm.visibility ?? 0.99,
-    };
-  });
+  // Apply EMA smoothing to reduce jitter
+  const smoothedLandmarks = landmarkSmoother.smooth(landmarks);
 
   // Calculate joint angles from detected landmarks
-  const angles = calculateAllAngles(landmarks);
+  const angles = calculateAllAngles(smoothedLandmarks);
 
-  if (!angles) {
-    debugLog('calculateAllAngles returned null');
-    return null;
+  // Compare with target pose if provided (now with optional weights and tolerances)
+  // NOTE: comparison may be null if angles couldn't be computed,
+  // but we still return landmarks so the skeleton can draw.
+  const comparison = (angles && targetAngles)
+    ? comparePose(angles, targetAngles, jointWeights, tolerances)
+    : null;
+
+  if (angles) {
+    debugLog('Pose processed — accuracy:', comparison?.overallAccuracy, '%, angles:', JSON.stringify(angles).substring(0, 100));
+  } else {
+    debugLog('Landmarks found but angles could not be computed');
   }
 
-  // Compare with target pose if provided
-  const comparison = targetAngles ? comparePose(angles, targetAngles) : null;
-
-  debugLog('Pose processed — accuracy:', comparison?.overallAccuracy, '%, angles:', JSON.stringify(angles).substring(0, 100));
-
   return {
-    landmarks,
+    landmarks: smoothedLandmarks,
     angles,
     comparison,
     timestamp: Date.now(),
     inferenceTime: results.inferenceTime || 0,
   };
+}
+
+/**
+ * Reset the landmark smoother (call when session starts/ends).
+ */
+export function resetSmoother() {
+  landmarkSmoother.reset();
 }
 
 /**

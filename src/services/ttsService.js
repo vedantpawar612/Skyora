@@ -1,4 +1,5 @@
 // Text-to-Speech Service for real-time voice feedback
+// Supports guided instruction phase and active correction phase
 import * as Speech from 'expo-speech';
 
 class TTSService {
@@ -6,59 +7,127 @@ class TTSService {
     this.isSpeaking = false;
     this.lastSpokenMessage = '';
     this.lastSpeakTime = 0;
-    this.cooldownMs = 5000; // 5 seconds between same message
-    this.minIntervalMs = 2500; // 2.5 seconds between any messages
+    this.sameMsgCooldownMs = 5000;   // 5s between same message
+    this.diffMsgCooldownMs = 2000;   // 2s between different messages
     this.enabled = true;
     this.speechRate = 0.95;
     this.speechPitch = 1.0;
     this.language = 'en-US';
+
+    // Message queue — stores the most recent pending message
+    // so important corrections aren't silently dropped
+    this._pendingMessage = null;
+    this._queueTimer = null;
   }
 
   /**
-   * Speak a feedback message with cooldown logic
-   * Prevents repetitive/overlapping speech
+   * Speak a feedback message with cooldown logic and queueing.
+   * If currently speaking or in cooldown, queues the message
+   * and speaks it when ready.
    */
   async speak(message) {
     if (!this.enabled || !message) return;
 
     const now = Date.now();
 
-    // Don't interrupt if still speaking
-    if (this.isSpeaking) return;
-
-    // Don't repeat the same message within cooldown
-    if (message === this.lastSpokenMessage && 
-        now - this.lastSpeakTime < this.cooldownMs) {
+    // Don't interrupt if still speaking — queue instead
+    if (this.isSpeaking) {
+      this._queueMessage(message);
       return;
     }
 
-    // Enforce minimum interval between any messages
-    if (now - this.lastSpeakTime < this.minIntervalMs) return;
+    // Cooldown check
+    const cooldown = message === this.lastSpokenMessage
+      ? this.sameMsgCooldownMs
+      : this.diffMsgCooldownMs;
 
-    try {
-      this.isSpeaking = true;
-      this.lastSpokenMessage = message;
-      this.lastSpeakTime = now;
-
-      await Speech.speak(message, {
-        language: this.language,
-        rate: this.speechRate,
-        pitch: this.speechPitch,
-        onDone: () => {
-          this.isSpeaking = false;
-        },
-        onError: () => {
-          this.isSpeaking = false;
-        },
-      });
-    } catch (error) {
-      this.isSpeaking = false;
-      console.warn('TTS Error:', error);
+    if (now - this.lastSpeakTime < cooldown) {
+      this._queueMessage(message);
+      return;
     }
+
+    this._doSpeak(message);
   }
 
   /**
-   * Speak encouragement based on accuracy
+   * Speak a guided setup instruction (slower, clearer).
+   * Used during the preparation phase before detection starts.
+   */
+  async speakInstruction(instruction) {
+    if (!this.enabled || !instruction) return;
+
+    // Stop any current speech first
+    await this.stop();
+
+    // Use a slightly slower rate for clarity
+    const prevRate = this.speechRate;
+    this.speechRate = 0.85;
+    await this._doSpeak(instruction);
+    this.speechRate = prevRate;
+  }
+
+  /**
+   * Speak the most critical joint correction.
+   * Uses adaptive cooldown — shorter when accuracy is very low.
+   */
+  async speakCorrection(message, accuracy) {
+    if (!this.enabled || !message) return;
+
+    const now = Date.now();
+
+    // Adaptive cooldown: speak more frequently when user needs more help
+    let cooldown = this.diffMsgCooldownMs;
+    if (accuracy < 40) {
+      cooldown = 1500; // More urgent
+    } else if (accuracy < 60) {
+      cooldown = 2000;
+    } else if (accuracy >= 80) {
+      cooldown = 4000; // Less frequent when doing well
+    }
+
+    if (this.isSpeaking) {
+      this._queueMessage(message);
+      return;
+    }
+
+    // Same-message cooldown always applies
+    if (message === this.lastSpokenMessage && now - this.lastSpeakTime < this.sameMsgCooldownMs) {
+      return;
+    }
+
+    if (now - this.lastSpeakTime < cooldown) {
+      this._queueMessage(message);
+      return;
+    }
+
+    this._doSpeak(message);
+  }
+
+  /**
+   * Announce a phase transition (e.g., starting detection).
+   */
+  async speakPhaseTransition(message) {
+    if (!this.enabled || !message) return;
+    await this.stop();
+    await this._doSpeak(message);
+  }
+
+  /**
+   * Speak session start announcement.
+   */
+  speakSessionStart(poseName) {
+    this.speakPhaseTransition(`Let's practice ${poseName}. Follow the instructions to get into position.`);
+  }
+
+  /**
+   * Speak session end announcement.
+   */
+  speakSessionEnd(accuracy) {
+    this.speakPhaseTransition(`Session complete! Your accuracy was ${accuracy} percent.`);
+  }
+
+  /**
+   * Speak encouragement based on accuracy level.
    */
   speakEncouragement(accuracy) {
     if (accuracy >= 90) {
@@ -67,37 +136,30 @@ class TTSService {
       this.speak('Great job! Almost perfect.');
     } else if (accuracy >= 70) {
       this.speak('Good progress! Make small adjustments.');
+    } else if (accuracy >= 50) {
+      this.speak('Keep trying! Follow the corrections.');
     }
   }
 
   /**
-   * Speak session start
-   */
-  speakSessionStart(poseName) {
-    this.speak(`Starting ${poseName}. Follow the instructions on screen.`);
-  }
-
-  /**
-   * Speak session end
-   */
-  speakSessionEnd(accuracy) {
-    this.speak(`Session complete! Your accuracy was ${accuracy} percent.`);
-  }
-
-  /**
-   * Stop any ongoing speech
+   * Stop any ongoing speech and clear the queue.
    */
   async stop() {
     try {
       await Speech.stop();
-      this.isSpeaking = false;
     } catch (error) {
       console.warn('TTS Stop Error:', error);
+    }
+    this.isSpeaking = false;
+    this._pendingMessage = null;
+    if (this._queueTimer) {
+      clearTimeout(this._queueTimer);
+      this._queueTimer = null;
     }
   }
 
   /**
-   * Toggle TTS on/off
+   * Toggle TTS on/off.
    */
   toggle() {
     this.enabled = !this.enabled;
@@ -108,18 +170,80 @@ class TTSService {
   }
 
   /**
-   * Set speech rate
+   * Set speech rate.
    */
   setRate(rate) {
     this.speechRate = Math.max(0.5, Math.min(2.0, rate));
   }
 
   /**
-   * Dispose / cleanup
+   * Dispose / cleanup.
    */
   dispose() {
     this.stop();
     this.isSpeaking = false;
+  }
+
+  // ─── Internal Methods ───
+
+  /**
+   * Actually perform the speech.
+   */
+  async _doSpeak(message) {
+    try {
+      this.isSpeaking = true;
+      this.lastSpokenMessage = message;
+      this.lastSpeakTime = Date.now();
+
+      await Speech.speak(message, {
+        language: this.language,
+        rate: this.speechRate,
+        pitch: this.speechPitch,
+        onDone: () => {
+          this.isSpeaking = false;
+          this._processQueue();
+        },
+        onError: () => {
+          this.isSpeaking = false;
+          this._processQueue();
+        },
+      });
+    } catch (error) {
+      this.isSpeaking = false;
+      console.warn('TTS Error:', error);
+    }
+  }
+
+  /**
+   * Queue a message (keeps only the most recent).
+   */
+  _queueMessage(message) {
+    this._pendingMessage = message;
+
+    // Set a timer to process the queue after cooldown
+    if (!this._queueTimer) {
+      this._queueTimer = setTimeout(() => {
+        this._queueTimer = null;
+        this._processQueue();
+      }, this.diffMsgCooldownMs);
+    }
+  }
+
+  /**
+   * Process the queued message if available and not speaking.
+   */
+  _processQueue() {
+    if (this.isSpeaking || !this._pendingMessage || !this.enabled) return;
+
+    const msg = this._pendingMessage;
+    this._pendingMessage = null;
+
+    // Don't repeat same message
+    if (msg === this.lastSpokenMessage && Date.now() - this.lastSpeakTime < this.sameMsgCooldownMs) {
+      return;
+    }
+
+    this._doSpeak(msg);
   }
 }
 

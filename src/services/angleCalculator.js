@@ -11,27 +11,33 @@
  * @returns {number} Angle in degrees (0-180)
  */
 export const calculateAngle = (pointA, pointB, pointC) => {
-  if (!pointA || !pointB || !pointC) return 0;
+  if (!pointA || !pointB || !pointC) return null;
+
+  // Skip low-visibility landmarks (threshold 0.5)
+  const minVis = Math.min(pointA.visibility ?? 1, pointB.visibility ?? 1, pointC.visibility ?? 1);
+  if (minVis < 0.5) return null;
 
   const vectorBA = {
     x: pointA.x - pointB.x,
     y: pointA.y - pointB.y,
+    z: (pointA.z || 0) - (pointB.z || 0),
   };
 
   const vectorBC = {
     x: pointC.x - pointB.x,
     y: pointC.y - pointB.y,
+    z: (pointC.z || 0) - (pointB.z || 0),
   };
 
   // Dot product
-  const dotProduct = vectorBA.x * vectorBC.x + vectorBA.y * vectorBC.y;
+  const dotProduct = vectorBA.x * vectorBC.x + vectorBA.y * vectorBC.y + vectorBA.z * vectorBC.z;
 
   // Magnitudes
-  const magnitudeBA = Math.sqrt(vectorBA.x ** 2 + vectorBA.y ** 2);
-  const magnitudeBC = Math.sqrt(vectorBC.x ** 2 + vectorBC.y ** 2);
+  const magnitudeBA = Math.sqrt(vectorBA.x ** 2 + vectorBA.y ** 2 + vectorBA.z ** 2);
+  const magnitudeBC = Math.sqrt(vectorBC.x ** 2 + vectorBC.y ** 2 + vectorBC.z ** 2);
 
   // Avoid division by zero
-  if (magnitudeBA === 0 || magnitudeBC === 0) return 0;
+  if (magnitudeBA === 0 || magnitudeBC === 0) return null;
 
   // Calculate angle
   const cosAngle = Math.max(-1, Math.min(1, dotProduct / (magnitudeBA * magnitudeBC)));
@@ -40,6 +46,7 @@ export const calculateAngle = (pointA, pointB, pointC) => {
 
   return Math.round(angleDegrees);
 };
+
 
 /**
  * Body landmark indices (MediaPipe Pose standard - 33 points)

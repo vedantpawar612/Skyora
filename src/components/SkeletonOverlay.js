@@ -17,6 +17,8 @@ const SkeletonOverlay = ({
 }) => {
   if (!landmarks || landmarks.length < 33) return null;
 
+  const safeJointResults = jointResults || {};
+
   const getJointColor = (index) => {
     // Map landmark index to joint name for color coding
     const jointMap = {
@@ -31,8 +33,8 @@ const SkeletonOverlay = ({
     };
 
     const jointName = jointMap[index];
-    if (jointName && jointResults[jointName]) {
-      const status = jointResults[jointName].status;
+    if (jointName && safeJointResults[jointName]) {
+      const status = safeJointResults[jointName].status;
       switch (status) {
         case 'good': return COLORS.jointGood;
         case 'close': return COLORS.jointClose;
@@ -122,7 +124,7 @@ const SkeletonOverlay = ({
         })}
 
         {/* Draw angle labels if enabled */}
-        {showAngles && Object.entries(jointResults).map(([jointName, result]) => {
+        {showAngles && Object.entries(safeJointResults).map(([jointName, result]) => {
           const jointToLandmark = {
             leftElbow: LANDMARK_INDICES.LEFT_ELBOW,
             rightElbow: LANDMARK_INDICES.RIGHT_ELBOW,

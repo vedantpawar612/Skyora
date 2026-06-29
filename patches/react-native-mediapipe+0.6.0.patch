@@ -1,8 +1,32 @@
+diff --git a/node_modules/react-native-mediapipe/android/src/main/java/com/reactnativemediapipe/posedetection/PoseDetectorHelper.kt b/node_modules/react-native-mediapipe/android/src/main/java/com/reactnativemediapipe/posedetection/PoseDetectorHelper.kt
+index 2641054..b321087 100644
+--- a/node_modules/react-native-mediapipe/android/src/main/java/com/reactnativemediapipe/posedetection/PoseDetectorHelper.kt
++++ b/node_modules/react-native-mediapipe/android/src/main/java/com/reactnativemediapipe/posedetection/PoseDetectorHelper.kt
+@@ -235,10 +235,7 @@ class PoseDetectorHelper(
+       )
+     }
+     val frameTime = SystemClock.uptimeMillis()
+-    // this is a hack bc we use this in the callback and it might have changed
+-//    this.imageRotation = orientationToDegrees(orientation)
+-    this.imageRotation = orientationToDegrees(Orientation.PORTRAIT)
+-    //    this.imageRotation = 90
++    this.imageRotation = orientationToDegrees(orientation)
+     detectAsync(mpImage, frameTime, this.imageRotation)
+   }
+ 
 diff --git a/node_modules/react-native-mediapipe/lib/commonjs/poseDetection/index.js b/node_modules/react-native-mediapipe/lib/commonjs/poseDetection/index.js
-index 8ed614f..0886b02 100644
+index 8ed614f..2acfd3f 100644
 --- a/node_modules/react-native-mediapipe/lib/commonjs/poseDetection/index.js
 +++ b/node_modules/react-native-mediapipe/lib/commonjs/poseDetection/index.js
-@@ -94,17 +94,36 @@ function usePoseDetection(callbacks, runningMode, model, options) {
+@@ -42,6 +42,7 @@ eventEmitter.addListener("onError", args => {
+ });
+ function usePoseDetection(callbacks, runningMode, model, options) {
+   const [detectorHandle, setDetectorHandle] = _react.default.useState();
++  const detectorHandleShared = (0, _reactNativeWorkletsCore.useSharedValue)(undefined);
+   const [cameraViewDimensions, setCameraViewDimensions] = _react.default.useState({
+     width: 1,
+     height: 1
+@@ -94,17 +95,38 @@ function usePoseDetection(callbacks, runningMode, model, options) {
    }, [updateDetectorMap]);
    _react.default.useEffect(() => {
      let newHandle;
@@ -30,6 +54,7 @@ index 8ed614f..0886b02 100644
 +        viewCoordinator: eagleVC
 +      });
 +      console.log("[PoseDetection-PATCHED] Eagerly registered handle", handle, "in detectorMap, size=", detectorMap.size);
++      detectorHandleShared.value = handle;
 +      setDetectorHandle(handle);
      }).catch(e => {
 -      console.error(`Failed to create detector: ${e}`);
@@ -39,16 +64,59 @@ index 8ed614f..0886b02 100644
 -      console.log("usePoseDetection.useEffect.unsub", "releaseDetector", newHandle);
 +      isMounted = false;
 +      console.log("[PoseDetection-PATCHED] cleanup called, newHandle=", newHandle);
++      detectorHandleShared.value = undefined;
        if (newHandle !== undefined) {
 +        detectorMap.delete(newHandle);
          getPoseDetectionModule().releaseDetector(newHandle);
        }
      };
+@@ -129,20 +151,23 @@ function usePoseDetection(callbacks, runningMode, model, options) {
+     const orientation = forceOutputOrientation.value ?? outputOrientation.value;
+     // const orientation: ImageOrientation = frameOrientation.value;
+     const fpsMode = options?.fpsMode ?? "none";
+-    if (fpsMode === "none") {
+-      plugin?.call(frame, {
+-        detectorHandle,
+-        orientation
+-      });
+-    } else {
+-      (0, _reactNativeVisionCamera.runAtTargetFps)(fpsMode, () => {
++    const activeHandle = detectorHandleShared.value;
++    if (activeHandle !== undefined) {
++      if (fpsMode === "none") {
+         plugin?.call(frame, {
+-          detectorHandle,
++          detectorHandle: activeHandle,
+           orientation
+         });
+-      });
++      } else {
++        (0, _reactNativeVisionCamera.runAtTargetFps)(fpsMode, () => {
++          plugin?.call(frame, {
++            detectorHandle: activeHandle,
++            orientation
++          });
++        });
++      }
+     }
+-  }, [detectorHandle, forceOutputOrientation.value, frameOrientation, options?.fpsMode, outputOrientation.value, updateDetectorMapFromWorklet]);
++  }, [detectorHandleShared, forceOutputOrientation.value, frameOrientation, options?.fpsMode, outputOrientation.value, updateDetectorMapFromWorklet]);
+   return _react.default.useMemo(() => ({
+     cameraViewLayoutChangeHandler,
+     cameraDeviceChangeHandler: d => {
 diff --git a/node_modules/react-native-mediapipe/lib/module/poseDetection/index.js b/node_modules/react-native-mediapipe/lib/module/poseDetection/index.js
-index e32b6e5..8bf5c23 100644
+index e32b6e5..f2dff80 100644
 --- a/node_modules/react-native-mediapipe/lib/module/poseDetection/index.js
 +++ b/node_modules/react-native-mediapipe/lib/module/poseDetection/index.js
-@@ -85,17 +85,35 @@ export function usePoseDetection(callbacks, runningMode, model, options) {
+@@ -33,6 +33,7 @@ eventEmitter.addListener("onError", args => {
+ });
+ export function usePoseDetection(callbacks, runningMode, model, options) {
+   const [detectorHandle, setDetectorHandle] = React.useState();
++  const detectorHandleShared = useSharedValue(undefined);
+   const [cameraViewDimensions, setCameraViewDimensions] = React.useState({
+     width: 1,
+     height: 1
+@@ -85,17 +86,37 @@ export function usePoseDetection(callbacks, runningMode, model, options) {
    }, [updateDetectorMap]);
    React.useEffect(() => {
      let newHandle;
@@ -75,6 +143,7 @@ index e32b6e5..8bf5c23 100644
 +        viewCoordinator: eagleVC
 +      });
 +      console.log("[PoseDetection-PATCHED] Eagerly registered handle", handle, "in detectorMap, size=", detectorMap.size);
++      detectorHandleShared.value = handle;
 +      setDetectorHandle(handle);
      }).catch(e => {
 -      console.error(`Failed to create detector: ${e}`);
@@ -84,8 +153,61 @@ index e32b6e5..8bf5c23 100644
 -      console.log("usePoseDetection.useEffect.unsub", "releaseDetector", newHandle);
 +      isMounted = false;
 +      console.log("[PoseDetection-PATCHED] cleanup called, newHandle=", newHandle);
++      detectorHandleShared.value = undefined;
        if (newHandle !== undefined) {
 +        detectorMap.delete(newHandle);
          getPoseDetectionModule().releaseDetector(newHandle);
        }
      };
+@@ -120,20 +141,23 @@ export function usePoseDetection(callbacks, runningMode, model, options) {
+     const orientation = forceOutputOrientation.value ?? outputOrientation.value;
+     // const orientation: ImageOrientation = frameOrientation.value;
+     const fpsMode = options?.fpsMode ?? "none";
+-    if (fpsMode === "none") {
+-      plugin?.call(frame, {
+-        detectorHandle,
+-        orientation
+-      });
+-    } else {
+-      runAtTargetFps(fpsMode, () => {
++    const activeHandle = detectorHandleShared.value;
++    if (activeHandle !== undefined) {
++      if (fpsMode === "none") {
+         plugin?.call(frame, {
+-          detectorHandle,
++          detectorHandle: activeHandle,
+           orientation
+         });
+-      });
++      } else {
++        runAtTargetFps(fpsMode, () => {
++          plugin?.call(frame, {
++            detectorHandle: activeHandle,
++            orientation
++          });
++        });
++      }
+     }
+-  }, [detectorHandle, forceOutputOrientation.value, frameOrientation, options?.fpsMode, outputOrientation.value, updateDetectorMapFromWorklet]);
++  }, [detectorHandleShared, forceOutputOrientation.value, frameOrientation, options?.fpsMode, outputOrientation.value, updateDetectorMapFromWorklet]);
+   return React.useMemo(() => ({
+     cameraViewLayoutChangeHandler,
+     cameraDeviceChangeHandler: d => {
+diff --git a/node_modules/react-native-mediapipe/src/poseDetection/index.ts b/node_modules/react-native-mediapipe/src/poseDetection/index.ts
+index 8225ea5..fc35ee2 100644
+--- a/node_modules/react-native-mediapipe/src/poseDetection/index.ts
++++ b/node_modules/react-native-mediapipe/src/poseDetection/index.ts
+@@ -270,10 +270,9 @@ export function usePoseDetection(
+   const frameProcessor = useFrameProcessor(
+     (frame) => {
+       "worklet";
+-      // console.log(
+-      //   `frameProcessor: ${frame.orientation}: ${frame.width}x${frame.height}:${outputOrientation.value}`
+-      // );
+-      // const orientation = frame.orientation;
++      console.log(
++        `[FP] detectorHandle: ${detectorHandle}, orientation: ${frame.orientation}, outputOrientation: ${outputOrientation.value}`
++      );
+       if (frame.orientation !== frameOrientation.value) {
+         console.log("changing frame orientation", frame.orientation);
+         frameOrientation.value = frame.orientation;

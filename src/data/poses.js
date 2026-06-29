@@ -31,6 +31,23 @@ export const YOGA_POSES = [
       leftHip: 175,
       rightHip: 175,
     },
+    jointWeights: {
+      leftElbow: 0.3, rightElbow: 0.3, leftKnee: 0.7, rightKnee: 0.7,
+      leftShoulder: 0.5, rightShoulder: 0.5, leftHip: 0.8, rightHip: 0.8,
+    },
+    angleTolerance: {
+      leftElbow: 15, rightElbow: 15, leftKnee: 15, rightKnee: 15,
+      leftShoulder: 20, rightShoulder: 20, leftHip: 15, rightHip: 15,
+    },
+    cameraHint: 'front',
+    cameraHintText: 'Place your phone standing up, facing you directly',
+    setupInstructions: [
+      'Stand tall with your feet together',
+      'Let your arms hang naturally by your sides',
+      'Roll your shoulders back and down',
+      'Keep your spine straight and head level',
+      'Breathe deeply and hold steady',
+    ],
     benefits: ['Improves posture', 'Strengthens thighs', 'Reduces flat feet'],
   },
   {
@@ -55,13 +72,30 @@ export const YOGA_POSES = [
     targetAngles: {
       leftElbow: 170,
       rightElbow: 170,
-      leftKnee: 160,
+      leftKnee: 175, // FIXED: back knee should be straight
       rightKnee: 90,
       leftShoulder: 170,
       rightShoulder: 170,
       leftHip: 150,
       rightHip: 90,
     },
+    jointWeights: {
+      leftElbow: 0.3, rightElbow: 0.3, leftKnee: 0.6, rightKnee: 1.0,
+      leftShoulder: 0.8, rightShoulder: 0.8, leftHip: 0.7, rightHip: 0.9,
+    },
+    angleTolerance: {
+      leftElbow: 20, rightElbow: 20, leftKnee: 15, rightKnee: 12,
+      leftShoulder: 15, rightShoulder: 15, leftHip: 20, rightHip: 15,
+    },
+    cameraHint: 'front',
+    cameraHintText: 'Place your phone standing up, facing you directly',
+    setupInstructions: [
+      'Step your left foot back about 3 feet',
+      'Bend your right knee to 90 degrees',
+      'Raise both arms straight overhead',
+      'Square your hips toward the front',
+      'Lift your chest and look forward',
+    ],
     benefits: ['Strengthens legs', 'Opens hips and chest', 'Builds focus'],
   },
   {
@@ -93,6 +127,23 @@ export const YOGA_POSES = [
       leftHip: 170,
       rightHip: 100,
     },
+    jointWeights: {
+      leftElbow: 0.4, rightElbow: 0.4, leftKnee: 0.6, rightKnee: 1.0,
+      leftShoulder: 0.9, rightShoulder: 0.9, leftHip: 0.7, rightHip: 0.8,
+    },
+    angleTolerance: {
+      leftElbow: 15, rightElbow: 15, leftKnee: 15, rightKnee: 12,
+      leftShoulder: 15, rightShoulder: 15, leftHip: 15, rightHip: 15,
+    },
+    cameraHint: 'front',
+    cameraHintText: 'Place your phone standing up, facing you directly',
+    setupInstructions: [
+      'Stand with your feet wide apart',
+      'Turn your right foot out 90 degrees',
+      'Extend both arms out at shoulder height',
+      'Bend your right knee over your ankle',
+      'Look over your right hand',
+    ],
     benefits: ['Builds leg strength', 'Improves balance', 'Opens groin'],
   },
   {
@@ -115,8 +166,8 @@ export const YOGA_POSES = [
       'Hold for 30 seconds, then switch sides',
     ],
     targetAngles: {
-      leftElbow: 45,
-      rightElbow: 45,
+      leftElbow: 170, // FIXED: arms overhead should be straight
+      rightElbow: 170, // FIXED: arms overhead should be straight
       leftKnee: 175,
       rightKnee: 45,
       leftShoulder: 170,
@@ -124,6 +175,23 @@ export const YOGA_POSES = [
       leftHip: 175,
       rightHip: 90,
     },
+    jointWeights: {
+      leftElbow: 0.5, rightElbow: 0.5, leftKnee: 0.9, rightKnee: 1.0,
+      leftShoulder: 0.7, rightShoulder: 0.7, leftHip: 0.8, rightHip: 0.9,
+    },
+    angleTolerance: {
+      leftElbow: 20, rightElbow: 20, leftKnee: 12, rightKnee: 12,
+      leftShoulder: 20, rightShoulder: 20, leftHip: 15, rightHip: 15,
+    },
+    cameraHint: 'front',
+    cameraHintText: 'Place your phone standing up, facing you directly',
+    setupInstructions: [
+      'Stand on your left foot',
+      'Place your right foot on your inner left thigh',
+      'Bring your hands together at your chest',
+      'Find a steady point to focus on',
+      'Keep your balance and breathe',
+    ],
     benefits: ['Improves balance', 'Strengthens core', 'Builds concentration'],
   },
   {
@@ -155,6 +223,23 @@ export const YOGA_POSES = [
       leftHip: 70,
       rightHip: 70,
     },
+    jointWeights: {
+      leftElbow: 0.6, rightElbow: 0.6, leftKnee: 0.7, rightKnee: 0.7,
+      leftShoulder: 0.8, rightShoulder: 0.8, leftHip: 1.0, rightHip: 1.0,
+    },
+    angleTolerance: {
+      leftElbow: 15, rightElbow: 15, leftKnee: 15, rightKnee: 15,
+      leftShoulder: 15, rightShoulder: 15, leftHip: 15, rightHip: 15,
+    },
+    cameraHint: 'side',
+    cameraHintText: 'Place your phone to the side for best results',
+    setupInstructions: [
+      'Start on your hands and knees',
+      'Tuck your toes and lift your hips up',
+      'Straighten your arms and legs',
+      'Push your hips up and back',
+      'Let your head hang between your arms',
+    ],
     benefits: ['Stretches hamstrings', 'Strengthens arms', 'Calms the mind'],
   },
   {
@@ -186,6 +271,23 @@ export const YOGA_POSES = [
       leftHip: 170,
       rightHip: 170,
     },
+    jointWeights: {
+      leftElbow: 0.8, rightElbow: 0.8, leftKnee: 0.4, rightKnee: 0.4,
+      leftShoulder: 0.9, rightShoulder: 0.9, leftHip: 0.7, rightHip: 0.7,
+    },
+    angleTolerance: {
+      leftElbow: 15, rightElbow: 15, leftKnee: 15, rightKnee: 15,
+      leftShoulder: 20, rightShoulder: 20, leftHip: 15, rightHip: 15,
+    },
+    cameraHint: 'side',
+    cameraHintText: 'Place your phone to the side for best results',
+    setupInstructions: [
+      'Lie face down on the floor',
+      'Place your hands under your shoulders',
+      'Press into your hands and lift your chest',
+      'Keep your elbows slightly bent',
+      'Draw your shoulders back',
+    ],
     benefits: ['Strengthens spine', 'Opens chest', 'Relieves fatigue'],
   },
   {
@@ -217,6 +319,23 @@ export const YOGA_POSES = [
       leftHip: 170,
       rightHip: 90,
     },
+    jointWeights: {
+      leftElbow: 0.4, rightElbow: 0.4, leftKnee: 0.7, rightKnee: 0.7,
+      leftShoulder: 0.9, rightShoulder: 0.9, leftHip: 0.8, rightHip: 1.0,
+    },
+    angleTolerance: {
+      leftElbow: 15, rightElbow: 15, leftKnee: 15, rightKnee: 15,
+      leftShoulder: 15, rightShoulder: 15, leftHip: 15, rightHip: 15,
+    },
+    cameraHint: 'front',
+    cameraHintText: 'Place your phone standing up, facing you directly',
+    setupInstructions: [
+      'Stand with your feet wide apart',
+      'Turn your right foot out 90 degrees',
+      'Extend your arms out to the sides',
+      'Reach down to your right shin with your right hand',
+      'Extend your left arm straight up',
+    ],
     benefits: ['Stretches legs', 'Reduces stress', 'Improves digestion'],
   },
   {
@@ -248,6 +367,23 @@ export const YOGA_POSES = [
       leftHip: 100,
       rightHip: 100,
     },
+    jointWeights: {
+      leftElbow: 0.3, rightElbow: 0.3, leftKnee: 1.0, rightKnee: 1.0,
+      leftShoulder: 0.7, rightShoulder: 0.7, leftHip: 0.9, rightHip: 0.9,
+    },
+    angleTolerance: {
+      leftElbow: 20, rightElbow: 20, leftKnee: 12, rightKnee: 12,
+      leftShoulder: 20, rightShoulder: 20, leftHip: 12, rightHip: 12,
+    },
+    cameraHint: 'front',
+    cameraHintText: 'Place your phone standing up, facing you directly',
+    setupInstructions: [
+      'Stand with your feet together',
+      'Raise your arms straight overhead',
+      'Bend your knees as if sitting in a chair',
+      'Keep your weight in your heels',
+      'Keep your spine long and chest lifted',
+    ],
     benefits: ['Strengthens thighs', 'Tones core', 'Builds endurance'],
   },
   {
@@ -279,6 +415,23 @@ export const YOGA_POSES = [
       leftHip: 160,
       rightHip: 160,
     },
+    jointWeights: {
+      leftElbow: 0.4, rightElbow: 0.4, leftKnee: 1.0, rightKnee: 1.0,
+      leftShoulder: 0.5, rightShoulder: 0.5, leftHip: 0.9, rightHip: 0.9,
+    },
+    angleTolerance: {
+      leftElbow: 20, rightElbow: 20, leftKnee: 15, rightKnee: 15,
+      leftShoulder: 20, rightShoulder: 20, leftHip: 15, rightHip: 15,
+    },
+    cameraHint: 'side',
+    cameraHintText: 'Place your phone to the side for best results',
+    setupInstructions: [
+      'Lie on your back with knees bent',
+      'Place your feet flat, hip width apart',
+      'Press your feet down and lift your hips',
+      'Keep your thighs parallel',
+      'Hold your hips up and breathe',
+    ],
     benefits: ['Strengthens back', 'Opens chest', 'Reduces anxiety'],
   },
   {
@@ -310,6 +463,23 @@ export const YOGA_POSES = [
       leftHip: 40,
       rightHip: 40,
     },
+    jointWeights: {
+      leftElbow: 0.3, rightElbow: 0.3, leftKnee: 0.9, rightKnee: 0.9,
+      leftShoulder: 0.6, rightShoulder: 0.6, leftHip: 1.0, rightHip: 1.0,
+    },
+    angleTolerance: {
+      leftElbow: 20, rightElbow: 20, leftKnee: 20, rightKnee: 20,
+      leftShoulder: 20, rightShoulder: 20, leftHip: 20, rightHip: 20,
+    },
+    cameraHint: 'side',
+    cameraHintText: 'Place your phone to the side for best results',
+    setupInstructions: [
+      'Kneel on the floor',
+      'Sit back on your heels',
+      'Fold forward and rest your forehead down',
+      'Extend your arms forward on the floor',
+      'Relax your whole body',
+    ],
     benefits: ['Relieves stress', 'Stretches hips', 'Calms the brain'],
   },
 ];
