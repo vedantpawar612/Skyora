@@ -17,10 +17,12 @@
 
 import { usePoseDetection, KnownPoseLandmarks, MediapipeCamera } from 'react-native-mediapipe';
 import { RunningMode, Delegate } from 'react-native-mediapipe';
-import { Platform } from 'react-native';
+import { Platform, Dimensions } from 'react-native';
 import { calculateAllAngles, LANDMARK_INDICES, SKELETON_CONNECTIONS } from './angleCalculator';
 import { comparePose } from './poseComparisonService';
 import LandmarkSmoother from './landmarkSmoother';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Path to the bundled MediaPipe model asset
 // This references the .task file placed in assets/models/
@@ -146,16 +148,32 @@ export function processPoseResults(results, viewCoordinator, targetAngles, joint
     return null;
   }
 
-  // NOTE: forceOutputOrientation: 'portrait' in the detection options
-  // already handles the Android sensor rotation at the native level.
-  // We do NOT apply an additional JS-side rotation, as that would
-  // double-correct and place landmarks off-screen.
-  const landmarks = rawLandmarks.map((lm) => ({
-    x: lm.x,
-    y: lm.y,
-    z: lm.z || 0,
-    visibility: lm.visibility ?? 0.99,
-  }));
+  const frameDims = {
+    width: results.inputImageWidth || 640,
+    height: results.inputImageHeight || 480,
+  };
+
+  // Convert raw landmarks to screen space using the view coordinator
+  // to resolve native orientation, rotation, and aspect ratio.
+  const landmarks = rawLandmarks.map((lm) => {
+    if (viewCoordinator && typeof viewCoordinator.convertPoint === 'function') {
+      const converted = viewCoordinator.convertPoint(frameDims, { x: lm.x, y: lm.y });
+      // Scale z by viewSize width to maintain uniform 3D proportions in screen pixels
+      const zScale = viewCoordinator.viewSize?.width || SCREEN_WIDTH;
+      return {
+        x: converted.x,
+        y: converted.y,
+        z: (lm.z || 0) * zScale,
+        visibility: lm.visibility ?? 0.99,
+      };
+    }
+    return {
+      x: lm.x,
+      y: lm.y,
+      z: lm.z || 0,
+      visibility: lm.visibility ?? 0.99,
+    };
+  });
 
   // Apply EMA smoothing to reduce jitter
   const smoothedLandmarks = landmarkSmoother.smooth(landmarks);

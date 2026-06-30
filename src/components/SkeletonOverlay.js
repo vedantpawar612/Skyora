@@ -19,6 +19,11 @@ const SkeletonOverlay = ({
 
   const safeJointResults = jointResults || {};
 
+  // Check if coordinates are in screen pixels (values > 1.1) rather than normalized [0..1]
+  const isScreenCoords = React.useMemo(() => {
+    return landmarks.some(lm => Math.abs(lm.x) > 1.1 || Math.abs(lm.y) > 1.1);
+  }, [landmarks]);
+
   const getJointColor = (index) => {
     // Map landmark index to joint name for color coding
     const jointMap = {
@@ -45,6 +50,11 @@ const SkeletonOverlay = ({
   };
 
   const getScreenCoords = (landmark) => {
+    if (isScreenCoords) {
+      // viewCoordinator has already scaled, rotated, and mirrored the point.
+      // Draw it directly.
+      return { x: landmark.x, y: landmark.y };
+    }
     let x = landmark.x * width;
     if (mirrorX) x = width - x;
     const y = landmark.y * height;
