@@ -1,22 +1,28 @@
 // AI Yoga Trainer - Main App Entry
-// Navigation setup with auth flow and bottom tabs
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Platform } from 'react-native';
+// Role-based navigation: Student tabs vs Teacher tabs
+import React, { useState } from 'react';
+import { View, StyleSheet, Animated, Platform, Text } from 'react-native';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 
 // Config
 import { COLORS, FONTS, FONT_SIZES, BORDER_RADIUS, SPACING } from './src/config/theme';
+import { ROUTES } from './src/config/navigation';
 
-// Screens
+// Contexts
+import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+
+// Auth Screens
 import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import SignupScreen from './src/screens/auth/SignupScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
+import TeacherSignupScreen from './src/screens/auth/TeacherSignupScreen';
+
+// Student Screens
 import HomeScreen from './src/screens/HomeScreen';
 import PoseLibraryScreen from './src/screens/PoseLibraryScreen';
 import PoseDetailScreen from './src/screens/PoseDetailScreen';
@@ -25,14 +31,33 @@ import CameraSessionScreen from './src/screens/CameraSessionScreen';
 import ProgressScreen from './src/screens/ProgressScreen';
 import PranayamListScreen from './src/screens/PranayamListScreen';
 import BreathingSessionScreen from './src/screens/BreathingSessionScreen';
+import StudentExploreScreen from './src/screens/student/StudentExploreScreen';
+import StudentMyLearningScreen from './src/screens/student/StudentMyLearningScreen';
+import StudentProfileScreen from './src/screens/student/StudentProfileScreen';
 
-// Services
-import authService from './src/services/authService';
+// Teacher Screens
+import TeacherDashboardScreen from './src/screens/teacher/TeacherDashboardScreen';
+import TeacherCoursesScreen from './src/screens/teacher/TeacherCoursesScreen';
+import TeacherStudentsScreen from './src/screens/teacher/TeacherStudentsScreen';
+import TeacherLiveClassesScreen from './src/screens/teacher/TeacherLiveClassesScreen';
+import TeacherProfileScreen from './src/screens/teacher/TeacherProfileScreen';
+import CreateCourseScreen from './src/screens/teacher/CreateCourseScreen';
+import ScheduleClassScreen from './src/screens/teacher/ScheduleClassScreen';
+import TeacherAttendanceScreen from './src/screens/teacher/TeacherAttendanceScreen';
+import AIAssistantScreen from './src/screens/teacher/AIAssistantScreen';
+
+// Student Detail Screens
+import CourseDetailScreen from './src/screens/student/CourseDetailScreen';
+
+// Shared Screens
+import NotificationsScreen from './src/screens/shared/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Custom tab bar with glassmorphic design
+// ============================================================
+// Custom Tab Bar — shared glassmorphic design for both roles
+// ============================================================
 const CustomTabBar = ({ state, descriptors, navigation }) => {
   return (
     <View style={tabStyles.container}>
@@ -40,26 +65,27 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const isFocused = state.index === index;
+          const label = options.tabBarLabel || route.name;
 
           const getIcon = (name, focused) => {
-            let iconName;
-            switch (name) {
-              case 'Home':
-                iconName = focused ? 'home' : 'home-outline';
-                break;
-              case 'Library':
-                iconName = focused ? 'grid' : 'grid-outline';
-                break;
-              case 'Pranayam':
-                iconName = focused ? 'leaf' : 'leaf-outline';
-                break;
-              case 'Progress':
-                iconName = focused ? 'stats-chart' : 'stats-chart-outline';
-                break;
-              default:
-                iconName = 'ellipse';
-            }
-            return iconName;
+            const iconMap = {
+              // Student tabs
+              'Home': focused ? 'home' : 'home-outline',
+              'Explore': focused ? 'compass' : 'compass-outline',
+              'MyLearning': focused ? 'book' : 'book-outline',
+              'Progress': focused ? 'stats-chart' : 'stats-chart-outline',
+              'StudentProfile': focused ? 'person' : 'person-outline',
+              // Teacher tabs
+              'TeacherDashboard': focused ? 'grid' : 'grid-outline',
+              'TeacherCourses': focused ? 'library' : 'library-outline',
+              'TeacherStudents': focused ? 'people' : 'people-outline',
+              'TeacherLiveClasses': focused ? 'videocam' : 'videocam-outline',
+              'TeacherProfile': focused ? 'person' : 'person-outline',
+              // Legacy tabs
+              'Library': focused ? 'grid' : 'grid-outline',
+              'Pranayam': focused ? 'leaf' : 'leaf-outline',
+            };
+            return iconMap[name] || 'ellipse';
           };
 
           const onPress = () => {
@@ -97,7 +123,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                   ]}
                   onPress={onPress}
                 >
-                  {route.name}
+                  {label}
                 </Animated.Text>
               </Animated.View>
             </React.Fragment>
@@ -167,24 +193,85 @@ const tabStyles = StyleSheet.create({
   },
 });
 
-// Bottom Tab Navigator
-const TabNavigator = () => {
+// ============================================================
+// Student Tab Navigator
+// ============================================================
+const StudentTabNavigator = () => {
   return (
     <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{
-        headerShown: false,
-      }}
+      screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Library" component={PoseLibraryScreen} />
-      <Tab.Screen name="Pranayam" component={PranayamListScreen} />
-      <Tab.Screen name="Progress" component={ProgressScreen} />
+      <Tab.Screen
+        name={ROUTES.HOME}
+        component={HomeScreen}
+        options={{ tabBarLabel: 'Home' }}
+      />
+      <Tab.Screen
+        name={ROUTES.EXPLORE}
+        component={StudentExploreScreen}
+        options={{ tabBarLabel: 'Explore' }}
+      />
+      <Tab.Screen
+        name={ROUTES.MY_LEARNING}
+        component={StudentMyLearningScreen}
+        options={{ tabBarLabel: 'Learn' }}
+      />
+      <Tab.Screen
+        name={ROUTES.PROGRESS}
+        component={ProgressScreen}
+        options={{ tabBarLabel: 'Progress' }}
+      />
+      <Tab.Screen
+        name={ROUTES.STUDENT_PROFILE}
+        component={StudentProfileScreen}
+        options={{ tabBarLabel: 'Profile' }}
+      />
     </Tab.Navigator>
   );
 };
 
-// Auth Stack
+// ============================================================
+// Teacher Tab Navigator
+// ============================================================
+const TeacherTabNavigator = () => {
+  return (
+    <Tab.Navigator
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tab.Screen
+        name={ROUTES.TEACHER_DASHBOARD}
+        component={TeacherDashboardScreen}
+        options={{ tabBarLabel: 'Dashboard' }}
+      />
+      <Tab.Screen
+        name={ROUTES.TEACHER_COURSES}
+        component={TeacherCoursesScreen}
+        options={{ tabBarLabel: 'Courses' }}
+      />
+      <Tab.Screen
+        name={ROUTES.TEACHER_STUDENTS}
+        component={TeacherStudentsScreen}
+        options={{ tabBarLabel: 'Students' }}
+      />
+      <Tab.Screen
+        name={ROUTES.TEACHER_LIVE_CLASSES}
+        component={TeacherLiveClassesScreen}
+        options={{ tabBarLabel: 'Live' }}
+      />
+      <Tab.Screen
+        name={ROUTES.TEACHER_PROFILE}
+        component={TeacherProfileScreen}
+        options={{ tabBarLabel: 'Profile' }}
+      />
+    </Tab.Navigator>
+  );
+};
+
+// ============================================================
+// Auth Stack (unauthenticated users)
+// ============================================================
 const AuthStack = () => {
   return (
     <Stack.Navigator
@@ -194,15 +281,18 @@ const AuthStack = () => {
         contentStyle: { backgroundColor: COLORS.background },
       }}
     >
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Signup" component={SignupScreen} />
-      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen name={ROUTES.LOGIN} component={LoginScreen} />
+      <Stack.Screen name={ROUTES.SIGNUP} component={SignupScreen} />
+      <Stack.Screen name={ROUTES.TEACHER_SIGNUP} component={TeacherSignupScreen} />
+      <Stack.Screen name={ROUTES.FORGOT_PASSWORD} component={ForgotPasswordScreen} />
     </Stack.Navigator>
   );
 };
 
-// Main Stack (authenticated)
-const MainStack = () => {
+// ============================================================
+// Student Stack (authenticated student)
+// ============================================================
+const StudentStack = () => {
   return (
     <Stack.Navigator
       screenOptions={{
@@ -211,52 +301,75 @@ const MainStack = () => {
         contentStyle: { backgroundColor: COLORS.background },
       }}
     >
-      <Stack.Screen name="MainTabs" component={TabNavigator} />
-      <Stack.Screen name="PoseDetail" component={PoseDetailScreen} />
+      <Stack.Screen name={ROUTES.STUDENT_TABS} component={StudentTabNavigator} />
+      <Stack.Screen name={ROUTES.LIBRARY} component={PoseLibraryScreen} />
+      <Stack.Screen name={ROUTES.PRANAYAM} component={PranayamListScreen} />
+      <Stack.Screen name={ROUTES.POSE_DETAIL} component={PoseDetailScreen} />
       <Stack.Screen
-        name="VideoPlayer"
+        name={ROUTES.VIDEO_PLAYER}
         component={VideoPlayerScreen}
         options={{ animation: 'fade' }}
       />
       <Stack.Screen
-        name="CameraSession"
+        name={ROUTES.CAMERA_SESSION}
         component={CameraSessionScreen}
         options={{ animation: 'fade' }}
       />
-      <Stack.Screen
-        name="BreathingSession"
-        component={BreathingSessionScreen}
-        options={{ animation: 'fade' }}
-      />
+      <Stack.Screen name={ROUTES.BREATHING_SESSION} component={BreathingSessionScreen} options={{ animation: 'fade' }} />
+      <Stack.Screen name={ROUTES.COURSE_DETAIL} component={CourseDetailScreen} />
+      <Stack.Screen name={ROUTES.NOTIFICATIONS} component={NotificationsScreen} />
     </Stack.Navigator>
   );
 };
 
+// ============================================================
+// Teacher Stack (authenticated teacher)
+// ============================================================
+const TeacherStack = () => {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right',
+        contentStyle: { backgroundColor: COLORS.background },
+      }}
+    >
+      <Stack.Screen name={ROUTES.TEACHER_TABS} component={TeacherTabNavigator} />
+      <Stack.Screen name={ROUTES.CREATE_COURSE} component={CreateCourseScreen} />
+      <Stack.Screen name={ROUTES.SCHEDULE_CLASS} component={ScheduleClassScreen} />
+      <Stack.Screen name={ROUTES.TEACHER_ATTENDANCE} component={TeacherAttendanceScreen} />
+      <Stack.Screen name={ROUTES.AI_ASSISTANT} component={AIAssistantScreen} />
+      <Stack.Screen name={ROUTES.NOTIFICATIONS} component={NotificationsScreen} />
+    </Stack.Navigator>
+  );
+};
+
+// ============================================================
+// Navigation Router — picks the right stack based on auth + role
+// ============================================================
+const NavigationRouter = () => {
+  const { isAuthenticated, isTeacher, loading } = useAuth();
+
+  if (loading) {
+    return null; // Splash screen handles loading
+  }
+
+  if (!isAuthenticated) {
+    return <AuthStack />;
+  }
+
+  if (isTeacher) {
+    return <TeacherStack />;
+  }
+
+  return <StudentStack />;
+};
+
+// ============================================================
 // Root App
+// ============================================================
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Listen for auth state changes
-    const unsubscribe = authService.onAuthStateChanged((user) => {
-      setIsAuthenticated(!!user);
-      setIsLoading(false);
-    });
-
-    return unsubscribe;
-  }, []);
-
-  // Show splash screen
-  if (showSplash) {
-    return (
-      <>
-        <StatusBar style="light" />
-        <SplashScreen onFinish={() => setShowSplash(false)} />
-      </>
-    );
-  }
 
   const navigationTheme = {
     ...DarkTheme,
@@ -271,12 +384,24 @@ export default function App() {
     },
   };
 
+  // Show splash screen
+  if (showSplash) {
+    return (
+      <>
+        <StatusBar style="light" />
+        <SplashScreen onFinish={() => setShowSplash(false)} />
+      </>
+    );
+  }
+
   return (
     <>
       <StatusBar style="light" />
-      <NavigationContainer theme={navigationTheme}>
-        {isAuthenticated ? <MainStack /> : <AuthStack />}
-      </NavigationContainer>
+      <AuthProvider>
+        <NavigationContainer theme={navigationTheme}>
+          <NavigationRouter />
+        </NavigationContainer>
+      </AuthProvider>
     </>
   );
 }

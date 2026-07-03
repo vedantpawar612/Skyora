@@ -8,8 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZES, FONTS, SPACING, SHADOWS } from '../../config/theme';
 import GradientButton from '../../components/GradientButton';
-import authService from '../../services/authService';
-import firestoreService from '../../services/firestoreService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const { width } = Dimensions.get('window');
 
@@ -48,21 +47,19 @@ const SignupScreen = ({ navigation }) => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const { signUp } = useAuth();
+
   const handleSignup = async () => {
     if (!validate()) return;
     setLoading(true);
     try {
-      const { user, error } = await authService.signUp(email.trim(), password, name.trim());
+      const { user, error } = await signUp(email.trim(), password, name.trim(), {
+        age: age ? parseInt(age) : null,
+      });
       if (error) {
         Alert.alert('Signup Failed', error);
-      } else if (user) {
-        // Save user profile to Firestore
-        await firestoreService.createUserProfile(user.uid, {
-          name: name.trim(),
-          email: email.trim(),
-          age: age ? parseInt(age) : null,
-        });
       }
+      // Navigation is handled by AuthContext auth state listener
     } catch (e) {
       Alert.alert('Error', 'Something went wrong. Please try again.');
     }
@@ -146,6 +143,15 @@ const SignupScreen = ({ navigation }) => {
                     <Text style={styles.loginLink}>Sign In</Text>
                   </TouchableOpacity>
                 </View>
+
+                {/* Teacher signup link */}
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('TeacherSignup')}
+                  style={styles.teacherRow}
+                >
+                  <Ionicons name="school-outline" size={16} color={COLORS.accent} />
+                  <Text style={styles.teacherLink}>  Register as a Yoga Teacher</Text>
+                </TouchableOpacity>
               </View>
             </Animated.View>
           </ScrollView>
@@ -253,6 +259,20 @@ const styles = StyleSheet.create({
     color: COLORS.accent,
     fontSize: FONT_SIZES.md,
     ...FONTS.semiBold,
+  },
+  teacherRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.surfaceBorder,
+  },
+  teacherLink: {
+    color: COLORS.accent,
+    fontSize: FONT_SIZES.md,
+    ...FONTS.medium,
   },
 });
 

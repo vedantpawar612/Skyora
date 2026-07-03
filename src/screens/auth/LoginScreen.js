@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZES, FONTS, SPACING, SHADOWS } from '../../config/theme';
 import GradientButton from '../../components/GradientButton';
-import authService from '../../services/authService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const { width } = Dimensions.get('window');
 
@@ -39,15 +39,17 @@ const LoginScreen = ({ navigation }) => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const { signIn } = useAuth();
+
   const handleLogin = async () => {
     if (!validate()) return;
     setLoading(true);
     try {
-      const { user, error } = await authService.signIn(email.trim(), password);
+      const { user, error } = await signIn(email.trim(), password);
       if (error) {
         Alert.alert('Login Failed', error);
       }
-      // Navigation is handled by auth state listener in App.js
+      // Navigation is handled by AuthContext based on role
     } catch (e) {
       Alert.alert('Error', 'Something went wrong. Please try again.');
     }
@@ -153,6 +155,15 @@ const LoginScreen = ({ navigation }) => {
                     <Text style={styles.signupLink}>Sign Up</Text>
                   </TouchableOpacity>
                 </View>
+
+                {/* Teacher signup link */}
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('TeacherSignup')}
+                  style={styles.teacherRow}
+                >
+                  <Ionicons name="school-outline" size={16} color={COLORS.accent} />
+                  <Text style={styles.teacherLink}>  Register as a Yoga Teacher</Text>
+                </TouchableOpacity>
               </View>
             </Animated.View>
           </ScrollView>
@@ -299,6 +310,20 @@ const styles = StyleSheet.create({
     color: COLORS.accent,
     fontSize: FONT_SIZES.md,
     ...FONTS.semiBold,
+  },
+  teacherRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.surfaceBorder,
+  },
+  teacherLink: {
+    color: COLORS.accent,
+    fontSize: FONT_SIZES.md,
+    ...FONTS.medium,
   },
 });
 

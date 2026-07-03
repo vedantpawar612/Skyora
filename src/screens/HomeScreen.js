@@ -11,13 +11,12 @@ import { YOGA_POSES, getDifficultyColor } from '../data/poses';
 import StatCard from '../components/StatCard';
 import GradientButton from '../components/GradientButton';
 import { getGreeting } from '../utils/helpers';
-import authService from '../services/authService';
+import { useAuth } from '../contexts/AuthContext';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
-  const [user, setUser] = useState(null);
   const scrollAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -29,9 +28,9 @@ const HomeScreen = ({ navigation }) => {
     totalDuration: 3600,
   });
 
+  const { user, userProfile } = useAuth();
+
   useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    setUser(currentUser);
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 800,
@@ -47,7 +46,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleLogout = async () => {
-    await authService.logout();
+    navigation.navigate('StudentProfile');
   };
 
   return (
@@ -68,7 +67,7 @@ const HomeScreen = ({ navigation }) => {
             <View style={styles.header}>
               <View style={styles.headerLeft}>
                 <Text style={styles.greeting}>{getGreeting()} 👋</Text>
-                <Text style={styles.userName}>{user?.displayName || 'Yoga Enthusiast'}</Text>
+                <Text style={styles.userName}>{userProfile?.name || user?.displayName || 'Yoga Enthusiast'}</Text>
               </View>
               <TouchableOpacity onPress={handleLogout} style={styles.profileBtn}>
                 <LinearGradient colors={COLORS.gradientPrimary} style={styles.profileGradient}>
