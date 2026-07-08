@@ -45,9 +45,15 @@ import CreateCourseScreen from './src/screens/teacher/CreateCourseScreen';
 import ScheduleClassScreen from './src/screens/teacher/ScheduleClassScreen';
 import TeacherAttendanceScreen from './src/screens/teacher/TeacherAttendanceScreen';
 import AIAssistantScreen from './src/screens/teacher/AIAssistantScreen';
+import TeacherAnnouncementsScreen from './src/screens/teacher/TeacherAnnouncementsScreen';
+import TeacherRevenueScreen from './src/screens/teacher/TeacherRevenueScreen';
+import TeacherCertificatesScreen from './src/screens/teacher/TeacherCertificatesScreen';
 
 // Student Detail Screens
 import CourseDetailScreen from './src/screens/student/CourseDetailScreen';
+import StudentLiveClassesScreen from './src/screens/student/StudentLiveClassesScreen';
+import StudentCertificatesScreen from './src/screens/student/StudentCertificatesScreen';
+import PaymentHistoryScreen from './src/screens/student/PaymentHistoryScreen';
 
 // Shared Screens
 import NotificationsScreen from './src/screens/shared/NotificationsScreen';
@@ -317,6 +323,9 @@ const StudentStack = () => {
       />
       <Stack.Screen name={ROUTES.BREATHING_SESSION} component={BreathingSessionScreen} options={{ animation: 'fade' }} />
       <Stack.Screen name={ROUTES.COURSE_DETAIL} component={CourseDetailScreen} />
+      <Stack.Screen name={ROUTES.STUDENT_LIVE_CLASSES} component={StudentLiveClassesScreen} />
+      <Stack.Screen name={ROUTES.STUDENT_CERTIFICATES} component={StudentCertificatesScreen} />
+      <Stack.Screen name={ROUTES.PAYMENT_HISTORY} component={PaymentHistoryScreen} />
       <Stack.Screen name={ROUTES.NOTIFICATIONS} component={NotificationsScreen} />
     </Stack.Navigator>
   );
@@ -339,6 +348,9 @@ const TeacherStack = () => {
       <Stack.Screen name={ROUTES.SCHEDULE_CLASS} component={ScheduleClassScreen} />
       <Stack.Screen name={ROUTES.TEACHER_ATTENDANCE} component={TeacherAttendanceScreen} />
       <Stack.Screen name={ROUTES.AI_ASSISTANT} component={AIAssistantScreen} />
+      <Stack.Screen name={ROUTES.TEACHER_ANNOUNCEMENTS} component={TeacherAnnouncementsScreen} />
+      <Stack.Screen name={ROUTES.TEACHER_REVENUE} component={TeacherRevenueScreen} />
+      <Stack.Screen name={ROUTES.TEACHER_CERTIFICATES} component={TeacherCertificatesScreen} />
       <Stack.Screen name={ROUTES.NOTIFICATIONS} component={NotificationsScreen} />
     </Stack.Navigator>
   );
