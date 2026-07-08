@@ -49,7 +49,7 @@ export const AuthProvider = ({ children }) => {
         return defaultProfile;
       }
     } catch (error) {
-      console.error('[AuthContext] Error fetching profile:', error);
+      console.log('[AuthContext] Error fetching profile (using fallback):', error.message || error);
       setUserRole('student'); // Default to student on error
       return null;
     }
