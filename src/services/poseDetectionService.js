@@ -141,7 +141,7 @@ function extractLandmarks(results) {
  * @param {Object} [jointWeights] - Optional per-joint importance weights
  * @returns {Object|null} Processed result with landmarks, angles, and comparison
  */
-export function processPoseResults(results, viewCoordinator, targetAngles, jointWeights = null, tolerances = null) {
+export function processPoseResults(results, viewCoordinator, targetAngles, jointWeights = null, tolerances = null, customFeedback = null) {
   const rawLandmarks = extractLandmarks(results);
 
   if (!rawLandmarks) {
@@ -181,11 +181,11 @@ export function processPoseResults(results, viewCoordinator, targetAngles, joint
   // Calculate joint angles from detected landmarks
   const angles = calculateAllAngles(smoothedLandmarks);
 
-  // Compare with target pose if provided (now with optional weights and tolerances)
+  // Compare with target pose if provided (now with optional weights, tolerances, and custom feedback)
   // NOTE: comparison may be null if angles couldn't be computed,
   // but we still return landmarks so the skeleton can draw.
   const comparison = (angles && targetAngles)
-    ? comparePose(angles, targetAngles, jointWeights, tolerances)
+    ? comparePose(angles, targetAngles, jointWeights, tolerances, customFeedback)
     : null;
 
   if (angles) {

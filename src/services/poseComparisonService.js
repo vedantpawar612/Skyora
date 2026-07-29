@@ -104,7 +104,7 @@ function calculateJointAccuracy(deviation, tolerance = ANGLE_THRESHOLD) {
  * @param {Object} [tolerances] - Optional per-joint tolerances.
  * @returns {Object} Comparison results with accuracy and feedback
  */
-export const comparePose = (userAngles, targetAngles, jointWeights = null, tolerances = null) => {
+export const comparePose = (userAngles, targetAngles, jointWeights = null, tolerances = null, customFeedback = null) => {
   if (!userAngles || !targetAngles) {
     return {
       overallAccuracy: 0,
@@ -142,11 +142,18 @@ export const comparePose = (userAngles, targetAngles, jointWeights = null, toler
     }
 
     // Generate feedback if deviation exceeds tolerance
-    if (deviation > tolerance && FEEDBACK_MESSAGES[jointName]) {
+    if (deviation > tolerance) {
       const direction = userAngle < targetAngle ? 'tooSmall' : 'tooBig';
       const severity = deviation > (tolerance * 2) ? 'strong' : 'mild';
-      const messageObj = FEEDBACK_MESSAGES[jointName][direction];
-      const message = messageObj ? messageObj[severity] : null;
+      
+      let message = null;
+      if (customFeedback && customFeedback[jointName] && customFeedback[jointName][direction]) {
+        const customObj = customFeedback[jointName][direction];
+        message = typeof customObj === 'string' ? customObj : (customObj[severity] || customObj.mild || customObj.strong);
+      } else if (FEEDBACK_MESSAGES[jointName]) {
+        const messageObj = FEEDBACK_MESSAGES[jointName][direction];
+        message = messageObj ? messageObj[severity] : null;
+      }
 
       if (message) {
         feedbackList.push({

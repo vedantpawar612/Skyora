@@ -91,6 +91,7 @@ const CameraSessionScreen = ({ route, navigation }) => {
   const targetAnglesRef = useRef(pose.targetAngles);
   const jointWeightsRef = useRef(pose.jointWeights || null);
   const tolerancesRef = useRef(pose.angleTolerance || null);
+  const customFeedbackRef = useRef(pose.customFeedback || null);
   const accuracyRef = useRef(0);
   const resultCountRef = useRef(0);
   const lastResultTimeRef = useRef(0);
@@ -103,6 +104,7 @@ const CameraSessionScreen = ({ route, navigation }) => {
   useEffect(() => { targetAnglesRef.current = pose.targetAngles; }, [pose.targetAngles]);
   useEffect(() => { jointWeightsRef.current = pose.jointWeights || null; }, [pose.jointWeights]);
   useEffect(() => { tolerancesRef.current = pose.angleTolerance || null; }, [pose.angleTolerance]);
+  useEffect(() => { customFeedbackRef.current = pose.customFeedback || null; }, [pose.customFeedback]);
   useEffect(() => { sessionPhaseRef.current = sessionPhase; }, [sessionPhase]);
 
   // ── No-detection watchdog ──
@@ -151,6 +153,7 @@ const CameraSessionScreen = ({ route, navigation }) => {
         targetAnglesRef.current,
         jointWeightsRef.current,
         tolerancesRef.current,
+        customFeedbackRef.current,
       );
 
       if (processed) {
