@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Animated, StatusBar, Dimensions,
+  Animated, StatusBar, useWindowDimensions, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,47 +11,56 @@ import { COLORS, BORDER_RADIUS, FONT_SIZES, FONTS, SPACING, SHADOWS } from '../c
 import StatCard from '../components/StatCard';
 import { YOGA_POSES } from '../data/poses';
 import { formatDate, calculateAccuracyColor } from '../utils/helpers';
+import authService from '../services/authService';
+import firestoreService from '../services/firestoreService';
 
-const { width } = Dimensions.get('window');
-const CHART_WIDTH = width - SPACING.lg * 2 - SPACING.md * 2;
 const CHART_HEIGHT = 180;
 
-// Demo progress data
-const DEMO_PROGRESS = [
-  { id: '1', poseId: 'mountain_pose', accuracy: 65, duration: 45, timestamp: new Date(Date.now() - 6 * 86400000) },
-  { id: '2', poseId: 'warrior_one', accuracy: 58, duration: 30, timestamp: new Date(Date.now() - 5 * 86400000) },
-  { id: '3', poseId: 'tree_pose', accuracy: 72, duration: 35, timestamp: new Date(Date.now() - 4 * 86400000) },
-  { id: '4', poseId: 'downward_dog', accuracy: 68, duration: 50, timestamp: new Date(Date.now() - 3 * 86400000) },
-  { id: '5', poseId: 'warrior_two', accuracy: 75, duration: 40, timestamp: new Date(Date.now() - 2 * 86400000) },
-  { id: '6', poseId: 'cobra_pose', accuracy: 82, duration: 28, timestamp: new Date(Date.now() - 1 * 86400000) },
-  { id: '7', poseId: 'mountain_pose', accuracy: 88, duration: 55, timestamp: new Date() },
-];
-
 const ProgressScreen = ({ navigation }) => {
+  const { width } = useWindowDimensions();
+  const IS_WIDE = width >= 600;
+  const CHART_WIDTH = Math.min(width - SPACING.lg * 2 - SPACING.md * 2 - 28, 700);
   const [selectedPeriod, setSelectedPeriod] = useState('Week');
+  const [progress, setProgress] = useState([]); // newest-first, as returned by getProgressHistory
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const chartAnim = useRef(new Animated.Value(0)).current;
 
-  const progress = DEMO_PROGRESS;
-  const totalSessions = progress.length;
-  const avgAccuracy = Math.round(progress.reduce((s, p) => s + p.accuracy, 0) / totalSessions);
-  const totalDuration = progress.reduce((s, p) => s + p.duration, 0);
-  const bestAccuracy = Math.max(...progress.map(p => p.accuracy));
-
   useEffect(() => {
+    const load = async () => {
+      const uid = authService.getCurrentUser()?.uid;
+      if (!uid) { setLoading(false); return; }
+      const [historyRes, statsRes] = await Promise.all([
+        firestoreService.getProgressHistory(uid, 50),
+        firestoreService.getUserStats(uid),
+      ]);
+      setProgress(historyRes.data || []);
+      setStats(statsRes.data);
+      setLoading(false);
+    };
+    load();
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
       Animated.timing(chartAnim, { toValue: 1, duration: 1000, useNativeDriver: false }),
     ]).start();
   }, []);
 
-  // Build chart data
-  const chartData = progress.map((p, i) => ({
-    x: (i / (progress.length - 1)) * CHART_WIDTH,
-    y: CHART_HEIGHT - (p.accuracy / 100) * CHART_HEIGHT,
-    accuracy: p.accuracy,
-    date: p.timestamp,
-  }));
+  const totalSessions = stats?.totalSessions ?? 0;
+  const avgAccuracy = stats?.averageAccuracy ?? 0;
+  const totalDuration = stats?.totalDuration ?? 0;
+  const bestAccuracy = stats?.bestAccuracy ?? 0;
+
+  // Build chart data (oldest-first timeline; `progress` itself is newest-first)
+  const chartProgress = progress.length > 1 ? progress.slice().reverse() : progress;
+  const chartData = chartProgress.length > 1
+    ? chartProgress.map((p, i) => ({
+        x: (i / (chartProgress.length - 1)) * CHART_WIDTH,
+        y: CHART_HEIGHT - (p.accuracy / 100) * CHART_HEIGHT,
+        accuracy: p.accuracy,
+        date: p.timestamp,
+      }))
+    : [];
 
   const polylinePoints = chartData.map(d => `${d.x},${d.y}`).join(' ');
 
@@ -75,40 +84,98 @@ const ProgressScreen = ({ navigation }) => {
               <Text style={styles.headerSubtitle}>Track your yoga journey</Text>
             </View>
 
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+              </View>
+            ) : progress.length === 0 ? (
+              <View style={styles.encouragementCard}>
+                <LinearGradient
+                  colors={['rgba(108, 99, 255, 0.15)', 'rgba(0, 217, 166, 0.08)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.encouragementGradient}
+                >
+                  <Ionicons name="body-outline" size={28} color={COLORS.accent} />
+                  <Text style={styles.encouragementTitle}>No Sessions Yet</Text>
+                  <Text style={styles.encouragementText}>
+                    Complete your first AI practice session to start tracking your progress here.
+                  </Text>
+                </LinearGradient>
+              </View>
+            ) : (
+              <>
             {/* Stats Grid */}
-            <View style={styles.statsRow}>
-              <StatCard
-                title="Total Sessions"
-                value={totalSessions}
-                icon="flame-outline"
-                iconColor={COLORS.error}
-                gradient
-              />
-              <View style={{ width: SPACING.sm }} />
-              <StatCard
-                title="Avg Accuracy"
-                value={avgAccuracy}
-                suffix="%"
-                icon="analytics-outline"
-                iconColor={COLORS.accent}
-              />
-            </View>
-            <View style={styles.statsRow}>
-              <StatCard
-                title="Best Score"
-                value={bestAccuracy}
-                suffix="%"
-                icon="trophy-outline"
-                iconColor={COLORS.warning}
-              />
-              <View style={{ width: SPACING.sm }} />
-              <StatCard
-                title="Minutes"
-                value={Math.round(totalDuration / 60)}
-                icon="time-outline"
-                iconColor={COLORS.info}
-              />
-            </View>
+            {IS_WIDE ? (
+              <View style={styles.statsRow}>
+                <StatCard
+                  title="Total Sessions"
+                  value={totalSessions}
+                  icon="flame-outline"
+                  iconColor={COLORS.error}
+                  gradient
+                />
+                <View style={{ width: SPACING.sm }} />
+                <StatCard
+                  title="Avg Accuracy"
+                  value={avgAccuracy}
+                  suffix="%"
+                  icon="analytics-outline"
+                  iconColor={COLORS.accent}
+                />
+                <View style={{ width: SPACING.sm }} />
+                <StatCard
+                  title="Best Score"
+                  value={bestAccuracy}
+                  suffix="%"
+                  icon="trophy-outline"
+                  iconColor={COLORS.warning}
+                />
+                <View style={{ width: SPACING.sm }} />
+                <StatCard
+                  title="Minutes"
+                  value={Math.round(totalDuration / 60)}
+                  icon="time-outline"
+                  iconColor={COLORS.info}
+                />
+              </View>
+            ) : (
+              <>
+                <View style={styles.statsRow}>
+                  <StatCard
+                    title="Total Sessions"
+                    value={totalSessions}
+                    icon="flame-outline"
+                    iconColor={COLORS.error}
+                    gradient
+                  />
+                  <View style={{ width: SPACING.sm }} />
+                  <StatCard
+                    title="Avg Accuracy"
+                    value={avgAccuracy}
+                    suffix="%"
+                    icon="analytics-outline"
+                    iconColor={COLORS.accent}
+                  />
+                </View>
+                <View style={styles.statsRow}>
+                  <StatCard
+                    title="Best Score"
+                    value={bestAccuracy}
+                    suffix="%"
+                    icon="trophy-outline"
+                    iconColor={COLORS.warning}
+                  />
+                  <View style={{ width: SPACING.sm }} />
+                  <StatCard
+                    title="Minutes"
+                    value={Math.round(totalDuration / 60)}
+                    icon="time-outline"
+                    iconColor={COLORS.info}
+                  />
+                </View>
+              </>
+            )}
 
             {/* Accuracy Chart */}
             <View style={styles.chartCard}>
@@ -204,7 +271,7 @@ const ProgressScreen = ({ navigation }) => {
 
             {/* Session History */}
             <Text style={styles.sectionTitle}>Session History</Text>
-            {progress.slice().reverse().map((session, index) => {
+            {progress.map((session, index) => {
               const accColor = calculateAccuracyColor(session.accuracy);
               return (
                 <Animated.View
@@ -260,6 +327,8 @@ const ProgressScreen = ({ navigation }) => {
                 </Text>
               </LinearGradient>
             </View>
+              </>
+            )}
           </Animated.View>
         </ScrollView>
       </LinearGradient>
@@ -271,12 +340,17 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   gradient: { flex: 1 },
   scrollContent: {
-    paddingTop: 60,
+    paddingTop: 48,
     paddingBottom: 100,
     paddingHorizontal: SPACING.lg,
   },
+  loadingContainer: {
+    paddingVertical: SPACING.xxl * 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   // Header
-  header: { marginBottom: SPACING.lg },
+  header: { marginBottom: SPACING.md },
   headerTitle: {
     color: COLORS.textPrimary,
     fontSize: FONT_SIZES.xxl,
@@ -292,6 +366,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     marginBottom: SPACING.sm,
+    justifyContent: 'center',
   },
   // Chart
   chartCard: {

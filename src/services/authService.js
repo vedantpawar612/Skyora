@@ -2,6 +2,7 @@
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInAnonymously,
   signOut,
   sendPasswordResetEmail,
   onAuthStateChanged,
@@ -10,6 +11,22 @@ import {
 import { auth } from '../config/firebase';
 
 class AuthService {
+  // Guest sign-in for shared demo links. Requires the Anonymous provider to be
+  // enabled in Firebase Console → Authentication → Sign-in method.
+  async signInAsGuest() {
+    try {
+      const userCredential = await signInAnonymously(auth);
+      await updateProfile(userCredential.user, { displayName: 'Guest' });
+      return { user: userCredential.user, error: null };
+    } catch (error) {
+      return { user: null, error: this._getErrorMessage(error.code) };
+    }
+  }
+
+  isGuest() {
+    return !!auth.currentUser?.isAnonymous;
+  }
+
   // Sign up with email and password
   async signUp(email, password, displayName) {
     try {
@@ -70,7 +87,9 @@ class AuthService {
       case 'auth/invalid-email':
         return 'Please enter a valid email address.';
       case 'auth/operation-not-allowed':
-        return 'Email/password sign-in is not enabled.';
+        return 'This sign-in method is not enabled for this project.';
+      case 'auth/admin-restricted-operation':
+        return 'Guest access is not enabled for this project.';
       case 'auth/weak-password':
         return 'Password should be at least 6 characters long.';
       case 'auth/user-disabled':

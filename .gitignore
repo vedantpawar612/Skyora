@@ -21,6 +21,13 @@ expo-env.d.ts
 # Metro
 .metro-health-check*
 
+# Electron
+release/
+
+# generated MediaPipe runtime (see scripts/copy-mediapipe-wasm.js)
+public/mediapipe/wasm/
+public/mediapipe/vision_module.js
+
 # debug
 npm-debug.*
 yarn-debug.*
@@ -39,3 +46,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Firebase CLI
+firebase-debug.log
+.firebase/

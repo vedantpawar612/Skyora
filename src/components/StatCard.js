@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZES, FONTS, SPACING, SHADOWS } from '../config/theme';
 
-const StatCard = ({ title, value, icon, iconColor = COLORS.primary, suffix = '', gradient = false }) => {
+const StatCard = ({ title, value, icon, iconColor = COLORS.primary, suffix = '', gradient = false, style }) => {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const countAnim = useRef(new Animated.Value(0)).current;
 
@@ -24,7 +24,7 @@ const StatCard = ({ title, value, icon, iconColor = COLORS.primary, suffix = '',
     : {};
 
   return (
-    <Animated.View style={[styles.container, { transform: [{ scale: scaleAnim }] }]}>
+    <Animated.View style={[styles.container, style, { transform: [{ scale: scaleAnim }] }]}>
       <CardWrapper {...wrapperProps} style={styles.card}>
         <View style={[styles.iconContainer, { backgroundColor: iconColor + '15' }]}>
           <Ionicons name={icon} size={22} color={iconColor} />
@@ -42,6 +42,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     minWidth: 100,
+    maxWidth: 280,
   },
   card: {
     backgroundColor: COLORS.backgroundCard,

@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Animated, StatusBar, TextInput, Dimensions,
+  Animated, StatusBar, TextInput, useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,10 +10,13 @@ import { COLORS, BORDER_RADIUS, FONT_SIZES, FONTS, SPACING } from '../config/the
 import { YOGA_POSES, getPosesByLevel } from '../data/poses';
 import PoseCard from '../components/PoseCard';
 
-const { width } = Dimensions.get('window');
 const FILTERS = ['All', 'Beginner', 'Intermediate', 'Advanced'];
+const TARGET_TILE_WIDTH = 180;
 
 const PoseLibraryScreen = ({ navigation }) => {
+  const { width } = useWindowDimensions();
+  const GRID_COLUMNS = Math.max(2, Math.floor((width - SPACING.lg * 2) / (TARGET_TILE_WIDTH + SPACING.md)));
+  const GRID_TILE_WIDTH = (width - SPACING.lg * 2 - SPACING.md * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
@@ -47,6 +50,7 @@ const PoseLibraryScreen = ({ navigation }) => {
       <PoseCard
         pose={item}
         variant={viewMode}
+        tileWidth={viewMode === 'grid' ? GRID_TILE_WIDTH : undefined}
         onPress={() => navigation.navigate('PoseDetail', { pose: item })}
       />
     </Animated.View>
@@ -119,8 +123,8 @@ const PoseLibraryScreen = ({ navigation }) => {
           data={filteredPoses}
           renderItem={renderPose}
           keyExtractor={(item) => item.id}
-          numColumns={viewMode === 'grid' ? 2 : 1}
-          key={viewMode} // Force re-render on view mode change
+          numColumns={viewMode === 'grid' ? GRID_COLUMNS : 1}
+          key={`${viewMode}-${GRID_COLUMNS}`} // Force re-render on view mode / column count change
           columnWrapperStyle={viewMode === 'grid' ? styles.gridRow : undefined}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -213,7 +217,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   gridRow: {
-    justifyContent: 'space-between',
+    gap: SPACING.md,
   },
   // Empty
   emptyContainer: {

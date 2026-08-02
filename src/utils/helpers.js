@@ -38,6 +38,11 @@ export const calculateAccuracyColor = (accuracy) => {
   return '#FF5252';
 };
 
+export const humanizeJointName = (joint) => {
+  if (!joint) return '';
+  return joint.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()).trim();
+};
+
 export const generateSessionId = () => {
   return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };

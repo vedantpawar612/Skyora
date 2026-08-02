@@ -7,10 +7,11 @@ import { COLORS, BORDER_RADIUS, FONT_SIZES, FONTS, SPACING, SHADOWS } from '../c
 import { getDifficultyColor } from '../data/poses';
 
 const { width } = Dimensions.get('window');
-const cardWidth = (width - SPACING.lg * 3) / 2;
+const defaultCardWidth = (width - SPACING.lg * 3) / 2;
 
-const PoseCard = ({ pose, onPress, variant = 'grid' }) => {
+const PoseCard = ({ pose, onPress, variant = 'grid', tileWidth }) => {
   const difficultyColor = getDifficultyColor(pose.level);
+  const cardWidth = tileWidth || defaultCardWidth;
 
   if (variant === 'list') {
     return (
@@ -41,7 +42,7 @@ const PoseCard = ({ pose, onPress, variant = 'grid' }) => {
   }
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={[styles.gridCard, { width: cardWidth }]}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={[styles.gridCard, { width: cardWidth, height: cardWidth * 1.3 }]}>
       <Image source={{ uri: pose.thumbnailUrl }} style={styles.gridImage} />
       <LinearGradient
         colors={['transparent', 'rgba(10, 14, 33, 0.95)']}
@@ -62,7 +63,6 @@ const PoseCard = ({ pose, onPress, variant = 'grid' }) => {
 const styles = StyleSheet.create({
   // Grid variant
   gridCard: {
-    height: cardWidth * 1.3,
     borderRadius: BORDER_RADIUS.lg,
     overflow: 'hidden',
     marginBottom: SPACING.md,

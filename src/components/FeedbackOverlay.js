@@ -1,14 +1,14 @@
 // FeedbackOverlay Component - Displays corrective feedback and accuracy during pose detection
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZES, FONTS, SPACING } from '../config/theme';
 import { getAccuracyColor, getAccuracyStatus } from '../services/poseComparisonService';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-const FeedbackOverlay = ({ accuracy, primaryFeedback, feedback = [], duration, poseName }) => {
+const FeedbackOverlay = ({
+  accuracy, primaryFeedback, feedback = [], duration, poseName,
+  showTopBar = true, showAccuracyCircle = true,
+}) => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(-100)).current;
 
@@ -45,33 +45,37 @@ const FeedbackOverlay = ({ accuracy, primaryFeedback, feedback = [], duration, p
   return (
     <View style={styles.container} pointerEvents="box-none">
       {/* Top bar - Pose name and timer */}
-      <Animated.View style={[styles.topBar, { transform: [{ translateY: slideAnim }] }]}>
-        <View style={styles.topBarInner}>
-          <View style={styles.poseInfo}>
-            <Text style={styles.poseName}>{poseName}</Text>
-            <Text style={styles.statusText}>{statusText}</Text>
+      {showTopBar && (
+        <Animated.View style={[styles.topBar, { transform: [{ translateY: slideAnim }] }]}>
+          <View style={styles.topBarInner}>
+            <View style={styles.poseInfo}>
+              <Text style={styles.poseName}>{poseName}</Text>
+              <Text style={styles.statusText}>{statusText}</Text>
+            </View>
+            <View style={styles.timerContainer}>
+              <Ionicons name="time-outline" size={16} color={COLORS.accent} />
+              <Text style={styles.timerText}>{formatTimer(duration || 0)}</Text>
+            </View>
           </View>
-          <View style={styles.timerContainer}>
-            <Ionicons name="time-outline" size={16} color={COLORS.accent} />
-            <Text style={styles.timerText}>{formatTimer(duration || 0)}</Text>
-          </View>
-        </View>
-      </Animated.View>
+        </Animated.View>
+      )}
 
       {/* Accuracy circle */}
-      <Animated.View
-        style={[
-          styles.accuracyContainer,
-          { transform: [{ scale: pulseAnim }] },
-        ]}
-      >
-        <View style={[styles.accuracyCircle, { borderColor: accuracyColor }]}>
-          <Text style={[styles.accuracyValue, { color: accuracyColor }]}>
-            {accuracy}%
-          </Text>
-          <Text style={styles.accuracyLabel}>Accuracy</Text>
-        </View>
-      </Animated.View>
+      {showAccuracyCircle && (
+        <Animated.View
+          style={[
+            styles.accuracyContainer,
+            { transform: [{ scale: pulseAnim }] },
+          ]}
+        >
+          <View style={[styles.accuracyCircle, { borderColor: accuracyColor }]}>
+            <Text style={[styles.accuracyValue, { color: accuracyColor }]}>
+              {accuracy}%
+            </Text>
+            <Text style={styles.accuracyLabel}>Accuracy</Text>
+          </View>
+        </Animated.View>
+      )}
 
       {/* Bottom feedback panel */}
       <View style={styles.bottomPanel}>

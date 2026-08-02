@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Animated, Easing, Dimensions, StatusBar
+  Animated, Easing, useWindowDimensions, StatusBar
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONT_SIZES, FONTS, SPACING, SHADOWS, BORDER_RADIUS } from '../config/theme';
 import ttsService from '../services/ttsService';
 
-const { width } = Dimensions.get('window');
-
 const BreathingSessionScreen = ({ route, navigation }) => {
   const { technique } = route.params;
+  const { width, height } = useWindowDimensions();
+  // Capped so the circle (which animates up to ~2.2x scale) stays on-screen on desktop
+  const circleSize = Math.min(Math.min(width, height) * 0.4, 360);
 
   const [currentCycle, setCurrentCycle] = useState(1);
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
@@ -188,6 +189,9 @@ const BreathingSessionScreen = ({ route, navigation }) => {
             style={[
               styles.breathingCircle,
               {
+                width: circleSize,
+                height: circleSize,
+                borderRadius: circleSize / 2,
                 backgroundColor: technique.color + '20', // Opacity added
                 borderColor: technique.color,
                 transform: [{ scale: circleScale }],
@@ -265,9 +269,6 @@ const styles = StyleSheet.create({
   },
   breathingCircle: {
     position: 'absolute',
-    width: width * 0.4,
-    height: width * 0.4,
-    borderRadius: width * 0.2,
     borderWidth: 2,
   },
   centerTextContainer: {

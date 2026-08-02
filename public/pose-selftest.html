@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skyora — pose engine self-test</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0A0E21; color: #E8EAF2;
+         font: 14px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; }
+  header { padding: 12px 16px; border-bottom: 1px solid #222a45; }
+  h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .3px; }
+  #log { padding: 8px 16px; font-family: ui-monospace, Consolas, monospace;
+         font-size: 12px; white-space: pre-wrap; }
+  .ok { color: #00D9A6; } .bad { color: #FF5252; } .warn { color: #FFD600; }
+  #stage { position: relative; width: 100%; max-width: 960px; margin: 0 auto; }
+  video, canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  video { transform: scaleX(-1); object-fit: cover; }
+  #wrap { position: relative; width: 100%; aspect-ratio: 4/3; background: #000;
+          border-radius: 10px; overflow: hidden; }
+  #hud { padding: 10px 16px 24px; max-width: 960px; margin: 0 auto;
+         font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+  b { color: #6C63FF; }
+</style>
+</head>
+<body>
+<header><h1>Skyora — pose engine self-test</h1></header>
+<div id="log"></div>
+<div id="stage"><div id="wrap">
+  <video id="v" autoplay playsinline muted></video>
+  <canvas id="c"></canvas>
+</div></div>
+<div id="hud"></div>
+
+<script type="module">
+const logEl = document.getElementById('log');
+const hud = document.getElementById('hud');
+const say = (msg, cls = '') => {
+  logEl.insertAdjacentHTML('beforeend', `<div class="${cls}">${msg}</div>`);
+  console.log('[selftest] ' + msg);
+};
+
+// Mirrors the angle math in src/services/angleCalculator.js
+const angleAt = (a, b, c) => {
+  const v1 = { x: a.x - b.x, y: a.y - b.y };
+  const v2 = { x: c.x - b.x, y: c.y - b.y };
+  const m1 = Math.hypot(v1.x, v1.y), m2 = Math.hypot(v2.x, v2.y);
+  if (!m1 || !m2) return 0;
+  const cos = Math.max(-1, Math.min(1, (v1.x * v2.x + v1.y * v2.y) / (m1 * m2)));
+  return Math.round((Math.acos(cos) * 180) / Math.PI);
+};
+
+const BONES = [[11,12],[11,23],[12,24],[23,24],[11,13],[13,15],[12,14],[14,16],
+               [23,25],[25,27],[24,26],[26,28],[27,29],[27,31],[28,30],[28,32]];
+
+try {
+  say('1/4 requesting camera…');
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+    audio: false,
+  });
+  const video = document.getElementById('v');
+  video.srcObject = stream;
+  await new Promise((r) => (video.onloadedmetadata = r));
+  await video.play();
+  say(`    camera OK — ${video.videoWidth}x${video.videoHeight}`, 'ok');
+
+  say('2/4 loading MediaPipe bundle…');
+  await import('/mediapipe/vision-loader.js');
+  const vision = window.__skyoraVision;
+  const { FilesetResolver, PoseLandmarker } = vision;
+  say('    bundle OK', 'ok');
+
+  say('3/4 loading WASM + pose model (~17 MB first run)…');
+  const fileset = await FilesetResolver.forVisionTasks('/mediapipe/wasm');
+  const mk = (delegate) => PoseLandmarker.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: '/mediapipe/models/pose_landmarker_lite.task', delegate },
+    runningMode: 'VIDEO',
+    numPoses: 1,
+  });
+  let landmarker, delegate = 'GPU';
+  try { landmarker = await mk('GPU'); }
+  catch { delegate = 'CPU'; landmarker = await mk('CPU'); say('    GPU delegate failed → CPU', 'warn'); }
+  say(`    model OK — delegate=${delegate}`, 'ok');
+
+  say('4/4 running live detection — stand back so your whole body is visible.', 'ok');
+
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let frames = 0, detected = 0, lastFpsAt = performance.now(), fps = 0, lastVideoTime = -1;
+
+  const draw = () => {
+    requestAnimationFrame(draw);
+    const W = canvas.width = canvas.clientWidth;
+    const H = canvas.height = canvas.clientHeight;
+    if (video.readyState < 2 || video.currentTime === lastVideoTime) return;
+    lastVideoTime = video.currentTime;
+
+    const res = landmarker.detectForVideo(video, performance.now());
+    frames++;
+    const now = performance.now();
+    if (now - lastFpsAt >= 1000) { fps = frames; frames = 0; lastFpsAt = now; }
+
+    ctx.clearRect(0, 0, W, H);
+    const lm = res.landmarks && res.landmarks[0];
+    if (!lm) {
+      hud.innerHTML = `<b>fps</b> ${fps} &nbsp; <span class="warn">no body detected — step back</span>`;
+      return;
+    }
+    detected++;
+
+    // Same object-fit: cover projection the app uses, then the selfie mirror.
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const s = Math.max(W / vw, H / vh);
+    const dw = vw * s, dh = vh * s;
+    const ox = (W - dw) / 2, oy = (H - dh) / 2;
+    const P = (p) => ({ x: W - (ox + p.x * dw), y: oy + p.y * dh });
+
+    ctx.strokeStyle = '#6C63FF'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    for (const [a, b] of BONES) {
+      if (!lm[a] || !lm[b]) continue;
+      const pa = P(lm[a]), pb = P(lm[b]);
+      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+    }
+    ctx.fillStyle = '#00D9A6';
+    for (const i of [0,11,12,13,14,15,16,23,24,25,26,27,28]) {
+      if (!lm[i]) continue;
+      const p = P(lm[i]);
+      ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Angles in aspect-corrected space, exactly like poseEngine.web.js
+    const aspect = vw / vh;
+    const iso = lm.map((p) => ({ x: p.x * aspect, y: p.y }));
+    const A = {
+      leftElbow: angleAt(iso[11], iso[13], iso[15]),
+      rightElbow: angleAt(iso[12], iso[14], iso[16]),
+      leftShoulder: angleAt(iso[13], iso[11], iso[23]),
+      rightShoulder: angleAt(iso[14], iso[12], iso[24]),
+      leftHip: angleAt(iso[11], iso[23], iso[25]),
+      rightHip: angleAt(iso[12], iso[24], iso[26]),
+      leftKnee: angleAt(iso[23], iso[25], iso[27]),
+      rightKnee: angleAt(iso[24], iso[26], iso[28]),
+    };
+    hud.innerHTML = `<b>fps</b> ${fps} &nbsp; <b>detected</b> ${detected} frames &nbsp; <b>delegate</b> ${delegate}<br>`
+      + Object.entries(A).map(([k, v]) => `${k}=${String(v).padStart(3)}°`).join('  ');
+  };
+  draw();
+} catch (err) {
+  say('FAILED: ' + (err && err.message ? err.message : String(err)), 'bad');
+  say('If this is a camera error, check OS/browser camera permissions.', 'warn');
+}
+</script>
+</body>
+</html>

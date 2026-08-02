@@ -1,33 +1,43 @@
 // Firebase Configuration
-// AI Yoga Trainer - Connected to Firebase project: ai-yoga-trainer-b6cad
+// Skyora - Connected to Firebase project: skyora-yoga-trainer-8df26
 import { initializeApp } from 'firebase/app';
-import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import {
+  getAuth,
+  initializeAuth,
+  getReactNativePersistence,
+  browserLocalPersistence,
+} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBVkKR9jEZ-XXu5muENV-6ejTU2iMHQrYY",
-  authDomain: "ai-yoga-trainer-b6cad.firebaseapp.com",
-  projectId: "ai-yoga-trainer-b6cad",
-  storageBucket: "ai-yoga-trainer-b6cad.firebasestorage.app",
-  messagingSenderId: "275724266609",
-  appId: "1:275724266609:web:da34838b2d6e30e40e7fd0",
-  measurementId: "G-YLQ5JL4GZ7",
+  apiKey: "AIzaSyC1f6Ft4R-4BnVQPkPy18WeX2CX7yUE0IY",
+  authDomain: "skyora-yoga-trainer-8df26.firebaseapp.com",
+  projectId: "skyora-yoga-trainer-8df26",
+  storageBucket: "skyora-yoga-trainer-8df26.firebasestorage.app",
+  messagingSenderId: "588165867994",
+  appId: "1:588165867994:web:e5bee1a643d8e4b6cf38e3",
+  measurementId: "G-0DZ2RBJJQ6",
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
 // Initialize Auth with persistence
+// getReactNativePersistence doesn't exist in the browser build of firebase/auth
 let auth;
-try {
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-} catch (e) {
-  auth = getAuth(app);
+if (Platform.OS === 'web') {
+  auth = initializeAuth(app, { persistence: browserLocalPersistence });
+} else {
+  try {
+    auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch (e) {
+    auth = getAuth(app);
+  }
 }
 
 // Initialize Firestore

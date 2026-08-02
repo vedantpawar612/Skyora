@@ -1,7 +1,7 @@
 // AI Yoga Trainer - Main App Entry
 // Navigation setup with auth flow and bottom tabs
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Platform } from 'react-native';
+import { View, StyleSheet, Animated, Platform, ActivityIndicator } from 'react-native';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -167,6 +167,15 @@ const tabStyles = StyleSheet.create({
   },
 });
 
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+
 // Bottom Tab Navigator
 const TabNavigator = () => {
   return (
@@ -255,6 +264,16 @@ export default function App() {
         <StatusBar style="light" />
         <SplashScreen onFinish={() => setShowSplash(false)} />
       </>
+    );
+  }
+
+  // Wait for Firebase to restore the session so the login screen doesn't flash
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar style="light" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
     );
   }
 

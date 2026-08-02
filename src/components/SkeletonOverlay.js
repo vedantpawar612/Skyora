@@ -14,8 +14,36 @@ const SkeletonOverlay = ({
   height = SCREEN_HEIGHT,
   showAngles = false,
   mirrorX = true,
+  minimal = false,
 }) => {
   if (!landmarks || landmarks.length < 33) return null;
+
+  if (minimal) {
+    const majorLandmarks = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+    return (
+      <View style={[styles.container, { width, height }]} pointerEvents="none">
+        <Svg width={width} height={height}>
+          {landmarks.map((landmark, index) => {
+            if (!landmark || landmark.visibility < 0.5) return null;
+            if (!majorLandmarks.includes(index)) return null;
+            let x = landmark.x * width;
+            if (mirrorX) x = width - x;
+            const y = landmark.y * height;
+            return (
+              <Circle
+                key={`min-joint-${index}`}
+                cx={x}
+                cy={y}
+                r={3}
+                fill="#FFFFFF"
+                opacity={0.6}
+              />
+            );
+          })}
+        </Svg>
+      </View>
+    );
+  }
 
   const getJointColor = (index) => {
     // Map landmark index to joint name for color coding

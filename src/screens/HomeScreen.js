@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Animated, Dimensions, StatusBar, Image, RefreshControl,
+  Animated, Dimensions, StatusBar, Image, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import StatCard from '../components/StatCard';
 import GradientButton from '../components/GradientButton';
 import { getGreeting } from '../utils/helpers';
 import authService from '../services/authService';
+import firestoreService from '../services/firestoreService';
 
 const { width } = Dimensions.get('window');
 
@@ -21,17 +22,21 @@ const HomeScreen = ({ navigation }) => {
   const scrollAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Demo stats (would come from Firestore in production)
-  const [stats] = useState({
-    totalSessions: 12,
-    averageAccuracy: 78,
-    dailyStreak: 5,
-    totalDuration: 3600,
-  });
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  const loadStats = async (uid) => {
+    if (!uid) { setStatsLoading(false); return; }
+    setStatsLoading(true);
+    const { data } = await firestoreService.getUserStats(uid);
+    setStats(data);
+    setStatsLoading(false);
+  };
 
   useEffect(() => {
     const currentUser = authService.getCurrentUser();
     setUser(currentUser);
+    loadStats(currentUser?.uid);
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 800,
@@ -39,11 +44,12 @@ const HomeScreen = ({ navigation }) => {
     }).start();
   }, []);
 
-  const featuredPoses = YOGA_POSES.slice(0, 4);
+  const featuredPoses = YOGA_POSES.slice(0, 8);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    await loadStats(user?.uid);
+    setRefreshing(false);
   };
 
   const handleLogout = async () => {
@@ -107,31 +113,37 @@ const HomeScreen = ({ navigation }) => {
 
             {/* Stats Row */}
             <Text style={styles.sectionTitle}>Your Progress</Text>
-            <View style={styles.statsRow}>
-              <StatCard
-                title="Sessions"
-                value={stats.totalSessions}
-                icon="flame-outline"
-                iconColor={COLORS.error}
-                gradient
-              />
-              <View style={{ width: SPACING.sm }} />
-              <StatCard
-                title="Accuracy"
-                value={stats.averageAccuracy}
-                suffix="%"
-                icon="analytics-outline"
-                iconColor={COLORS.accent}
-              />
-              <View style={{ width: SPACING.sm }} />
-              <StatCard
-                title="Streak"
-                value={stats.dailyStreak}
-                suffix="d"
-                icon="trending-up-outline"
-                iconColor={COLORS.warning}
-              />
-            </View>
+            {statsLoading ? (
+              <View style={styles.statsLoading}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              </View>
+            ) : (
+              <View style={styles.statsRow}>
+                <StatCard
+                  title="Sessions"
+                  value={stats?.totalSessions ?? 0}
+                  icon="flame-outline"
+                  iconColor={COLORS.error}
+                  gradient
+                />
+                <View style={{ width: SPACING.sm }} />
+                <StatCard
+                  title="Accuracy"
+                  value={stats?.averageAccuracy ?? 0}
+                  suffix="%"
+                  icon="analytics-outline"
+                  iconColor={COLORS.accent}
+                />
+                <View style={{ width: SPACING.sm }} />
+                <StatCard
+                  title="Streak"
+                  value={stats?.dailyStreak ?? 0}
+                  suffix="d"
+                  icon="trending-up-outline"
+                  iconColor={COLORS.warning}
+                />
+              </View>
+            )}
 
             {/* Featured Poses */}
             <View style={styles.sectionHeader}>
@@ -193,7 +205,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   gradient: { flex: 1 },
   scrollContent: {
-    paddingTop: 60,
+    paddingTop: 48,
     paddingBottom: 100,
     paddingHorizontal: SPACING.lg,
   },
@@ -227,27 +239,27 @@ const styles = StyleSheet.create({
   // Hero Card
   heroCard: {
     borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.lg,
-    marginBottom: SPACING.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
     overflow: 'hidden',
-    minHeight: 180,
+    minHeight: 140,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
   },
   heroContent: { flex: 1, zIndex: 1 },
   heroTitle: {
     color: COLORS.textPrimary,
-    fontSize: FONT_SIZES.xxl,
+    fontSize: FONT_SIZES.xl,
     ...FONTS.bold,
-    lineHeight: 34,
-    marginBottom: SPACING.sm,
+    lineHeight: 28,
+    marginBottom: SPACING.xs,
   },
   heroSubtext: {
     color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.md,
+    fontSize: FONT_SIZES.sm,
     ...FONTS.regular,
-    lineHeight: 22,
-    marginBottom: SPACING.md,
+    lineHeight: 18,
+    marginBottom: SPACING.sm,
   },
   heroBtn: { alignSelf: 'flex-start' },
   heroIconContainer: {
@@ -259,7 +271,13 @@ const styles = StyleSheet.create({
   // Stats
   statsRow: {
     flexDirection: 'row',
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
+  },
+  statsLoading: {
+    height: 96,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.md,
   },
   // Section
   sectionHeader: {
@@ -286,11 +304,11 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   featuredCard: {
-    width: width * 0.4,
-    height: width * 0.55,
+    width: Math.min(width * 0.38, 150),
+    height: Math.min(width * 0.52, 200),
     borderRadius: BORDER_RADIUS.lg,
     overflow: 'hidden',
-    marginRight: SPACING.md,
+    marginRight: SPACING.sm,
     backgroundColor: COLORS.backgroundCard,
     ...SHADOWS.small,
   },

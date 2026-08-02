@@ -1,0 +1,22 @@
+rules_version = '2';
+
+// Skyora only ever touches the signed-in user's own document tree.
+// Pose data is bundled in src/data/poses.js, not Firestore, so no rule is
+// needed for a `poses` collection — nothing reads one at runtime.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      // Session history written by firestoreService.saveProgress
+      match /progress/{doc} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
