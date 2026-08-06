@@ -39,7 +39,7 @@ if (Platform.OS !== 'web') {
   }
 }
 
-export { usePoseDetection, KnownPoseLandmarks, MediapipeCamera, RunningMode, Delegate };
+export { usePoseDetection, KnownPoseLandmarks, MediapipeCamera, RunningMode, Delegate, LANDMARK_INDICES, SKELETON_CONNECTIONS };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -248,13 +248,4 @@ export function getPoseDetectionConfig(overrides = {}) {
   };
 }
 
-// Re-export everything downstream consumers need
-export {
-  usePoseDetection,
-  RunningMode,
-  Delegate,
-  KnownPoseLandmarks,
-  MediapipeCamera,
-  LANDMARK_INDICES,
-  SKELETON_CONNECTIONS,
-};
+
