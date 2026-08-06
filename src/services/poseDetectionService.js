@@ -15,12 +15,31 @@
 //   1. angleCalculator uses direction vectors (scale-invariant)
 //   2. SkeletonOverlay already handles normalized→screen conversion
 
-import { usePoseDetection, KnownPoseLandmarks, MediapipeCamera } from 'react-native-mediapipe';
-import { RunningMode, Delegate } from 'react-native-mediapipe';
-import { Platform, Dimensions } from 'react-native';
+import { Platform, Dimensions, View } from 'react-native';
 import { calculateAllAngles, LANDMARK_INDICES, SKELETON_CONNECTIONS } from './angleCalculator';
 import { comparePose } from './poseComparisonService';
 import LandmarkSmoother from './landmarkSmoother';
+
+let usePoseDetection = () => ({});
+let KnownPoseLandmarks = {};
+let MediapipeCamera = View;
+let RunningMode = { LIVE_STREAM: 2 };
+let Delegate = { GPU: 1 };
+
+if (Platform.OS !== 'web') {
+  try {
+    const mp = require('react-native-mediapipe');
+    usePoseDetection = mp.usePoseDetection;
+    KnownPoseLandmarks = mp.KnownPoseLandmarks;
+    MediapipeCamera = mp.MediapipeCamera;
+    RunningMode = mp.RunningMode;
+    Delegate = mp.Delegate;
+  } catch (e) {
+    console.warn('[PoseDetection] Native MediaPipe module not available:', e.message);
+  }
+}
+
+export { usePoseDetection, KnownPoseLandmarks, MediapipeCamera, RunningMode, Delegate };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

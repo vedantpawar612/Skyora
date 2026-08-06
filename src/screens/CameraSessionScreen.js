@@ -11,9 +11,16 @@ import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar,
   Dimensions, Animated, Platform,
 } from 'react-native';
-import {
-  useCameraPermission,
-} from 'react-native-vision-camera';
+let useCameraPermission = () => ({ hasPermission: true, requestPermission: async () => true });
+
+if (Platform.OS !== 'web') {
+  try {
+    const vc = require('react-native-vision-camera');
+    useCameraPermission = vc.useCameraPermission;
+  } catch (e) {
+    console.warn('[CameraSession] Vision Camera not available:', e.message);
+  }
+}
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZES, FONTS, SPACING } from '../config/theme';
