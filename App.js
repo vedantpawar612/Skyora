@@ -54,6 +54,7 @@ import CourseDetailScreen from './src/screens/student/CourseDetailScreen';
 import StudentLiveClassesScreen from './src/screens/student/StudentLiveClassesScreen';
 import StudentCertificatesScreen from './src/screens/student/StudentCertificatesScreen';
 import PaymentHistoryScreen from './src/screens/student/PaymentHistoryScreen';
+import SessionResultScreen from './src/screens/SessionResultScreen';
 
 // Shared Screens
 import NotificationsScreen from './src/screens/shared/NotificationsScreen';
@@ -320,6 +321,11 @@ const StudentStack = () => {
         name={ROUTES.CAMERA_SESSION}
         component={CameraSessionScreen}
         options={{ animation: 'fade' }}
+      />
+      <Stack.Screen
+        name={ROUTES.SESSION_RESULT}
+        component={SessionResultScreen}
+        options={{ animation: 'slide_from_bottom' }}
       />
       <Stack.Screen name={ROUTES.BREATHING_SESSION} component={BreathingSessionScreen} options={{ animation: 'fade' }} />
       <Stack.Screen name={ROUTES.COURSE_DETAIL} component={CourseDetailScreen} />

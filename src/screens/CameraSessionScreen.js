@@ -38,6 +38,7 @@ import {
 } from '../services/poseDetectionService';
 import ttsService from '../services/ttsService';
 import { generateSessionId } from '../utils/helpers';
+import { ROUTES } from '../config/navigation';
 
 // ── Session phases ──
 const PHASE = {
@@ -105,6 +106,8 @@ const CameraSessionScreen = ({ route, navigation }) => {
   const noDetectionTimerRef = useRef(null);
   const instructionTimerRef = useRef(null);
   const countdownTimerRef = useRef(null);
+  const jointAccuracyHistoryRef = useRef({});   // { leftElbow: [acc1, acc2, ...], ... }
+  const jointFeedbackCountRef = useRef({});      // { leftElbow: { tooSmall: 5, tooBig: 0 }, ... }
 
   // Keep refs in sync with state
   useEffect(() => { ttsEnabledRef.current = ttsEnabled; }, [ttsEnabled]);
@@ -183,6 +186,26 @@ const CameraSessionScreen = ({ route, navigation }) => {
         // Only record history and speak during active detection phase
         if (sessionPhaseRef.current === PHASE.ACTIVE) {
           accuracyHistory.current.push(smoothedAccuracy);
+
+          // Track per-joint accuracy for the session report
+          if (processed.comparison?.jointResults) {
+            for (const [jointName, result] of Object.entries(processed.comparison.jointResults)) {
+              if (!jointAccuracyHistoryRef.current[jointName]) {
+                jointAccuracyHistoryRef.current[jointName] = [];
+              }
+              jointAccuracyHistoryRef.current[jointName].push(result.accuracy);
+            }
+          }
+
+          // Track feedback frequency per joint for improvement tips
+          if (processed.comparison?.allFeedback) {
+            for (const fb of processed.comparison.allFeedback) {
+              if (!jointFeedbackCountRef.current[fb.joint]) {
+                jointFeedbackCountRef.current[fb.joint] = { tooSmall: 0, tooBig: 0 };
+              }
+              jointFeedbackCountRef.current[fb.joint][fb.direction]++;
+            }
+          }
 
           // Use the new speakCorrection method with adaptive cooldown
           if (ttsEnabledRef.current && processed.comparison?.primaryFeedback) {
@@ -325,15 +348,56 @@ const CameraSessionScreen = ({ route, navigation }) => {
   // ── End Session ──
   const endSession = useCallback(() => {
     cleanupTimers();
-    setSessionPhase(PHASE.COMPLETE);
     ttsService.stop();
 
+    // Calculate session statistics
     const avgAccuracy = accuracyHistory.current.length > 0
       ? Math.round(accuracyHistory.current.reduce((a, b) => a + b, 0) / accuracyHistory.current.length)
       : 0;
-    setFinalAccuracy(avgAccuracy);
+
+    // Final pose accuracy — the smoothed accuracy of the last frame
+    const finalPoseAccuracy = accuracyRef.current || 0;
+
+    // Peak accuracy achieved during the session
+    const peakAccuracy = accuracyHistory.current.length > 0
+      ? Math.max(...accuracyHistory.current)
+      : 0;
+
+    // Starting accuracy — average of first 10% of readings
+    const startSlice = Math.max(1, Math.floor(accuracyHistory.current.length * 0.1));
+    const startingAccuracy = accuracyHistory.current.length > 0
+      ? Math.round(accuracyHistory.current.slice(0, startSlice).reduce((a, b) => a + b, 0) / startSlice)
+      : 0;
+
+    // Per-joint breakdown — average accuracy for each joint
+    const jointBreakdown = {};
+    for (const [joint, readings] of Object.entries(jointAccuracyHistoryRef.current)) {
+      jointBreakdown[joint] = readings.length > 0
+        ? Math.round(readings.reduce((a, b) => a + b, 0) / readings.length)
+        : 0;
+    }
+
+    // Sample accuracy timeline for chart (max 40 data points)
+    const sampleRate = Math.max(1, Math.floor(accuracyHistory.current.length / 40));
+    const accuracyTimeline = accuracyHistory.current.filter((_, i) => i % sampleRate === 0);
+
+    const sessionReport = {
+      pose,
+      avgAccuracy,
+      finalPoseAccuracy,
+      startingAccuracy,
+      peakAccuracy,
+      sessionDuration,
+      totalReadings: accuracyHistory.current.length,
+      accuracyTimeline,
+      jointBreakdown,
+      lastJointResults: comparison?.jointResults || {},
+      jointFeedbackCount: { ...jointFeedbackCountRef.current },
+    };
+
     ttsService.speakSessionEnd(avgAccuracy);
-  }, [cleanupTimers]);
+    navigation.replace(ROUTES.SESSION_RESULT, { sessionReport });
+  }, [cleanupTimers, sessionDuration, comparison, pose, navigation]);
 
   // ── Stop/Cancel Session ──
   const stopSession = useCallback(() => {
@@ -367,69 +431,17 @@ const CameraSessionScreen = ({ route, navigation }) => {
     );
   }
 
-  // Session complete — show results
+  // Session complete — navigating to SessionResultScreen
   if (sessionPhase === PHASE.COMPLETE) {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
         <LinearGradient colors={[COLORS.background, COLORS.backgroundLight]} style={styles.gradient}>
-          <Animated.View style={[styles.resultsContainer, { opacity: fadeAnim }]}>
-            <View style={styles.resultCircleOuter}>
-              <LinearGradient
-                colors={finalAccuracy >= 70 ? COLORS.gradientAccent : COLORS.gradientPrimary}
-                style={styles.resultCircle}
-              >
-                <Text style={styles.resultValue}>{finalAccuracy}%</Text>
-                <Text style={styles.resultLabel}>Accuracy</Text>
-              </LinearGradient>
-            </View>
-            <Text style={styles.resultTitle}>
-              {finalAccuracy >= 80 ? 'Excellent Work! 🎉' :
-               finalAccuracy >= 60 ? 'Good Progress! 💪' : 'Keep Practicing! 🧘'}
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ color: COLORS.textPrimary, fontFamily: FONTS.medium, fontSize: FONT_SIZES.lg }}>
+              Preparing your report...
             </Text>
-            <View style={styles.resultStats}>
-              <View style={styles.resultStatItem}>
-                <Ionicons name="time-outline" size={20} color={COLORS.accent} />
-                <Text style={styles.resultStatValue}>
-                  {Math.floor(sessionDuration / 60)}:{(sessionDuration % 60).toString().padStart(2, '0')}
-                </Text>
-                <Text style={styles.resultStatLabel}>Duration</Text>
-              </View>
-              <View style={styles.resultDivider} />
-              <View style={styles.resultStatItem}>
-                <Ionicons name="body-outline" size={20} color={COLORS.primary} />
-                <Text style={styles.resultStatValue}>{pose.name}</Text>
-                <Text style={styles.resultStatLabel}>Pose</Text>
-              </View>
-              <View style={styles.resultDivider} />
-              <View style={styles.resultStatItem}>
-                <Ionicons name="analytics-outline" size={20} color={COLORS.warning} />
-                <Text style={styles.resultStatValue}>{accuracyHistory.current.length}</Text>
-                <Text style={styles.resultStatLabel}>Readings</Text>
-              </View>
-            </View>
-            <View style={styles.resultActions}>
-              <GradientButton
-                title="Practice Again"
-                onPress={() => {
-                  setSessionPhase(PHASE.PRE_SESSION);
-                  setAccuracy(0);
-                  setLandmarks(null);
-                  setComparison(null);
-                  sessionId.current = generateSessionId();
-                  resetSmoother();
-                }}
-                icon={<Ionicons name="refresh" size={18} color="#FFF" />}
-                style={styles.resultBtn}
-              />
-              <GradientButton
-                title="Back to Library"
-                onPress={() => navigation.navigate('Library')}
-                variant="outline"
-                style={styles.resultBtn}
-              />
-            </View>
-          </Animated.View>
+          </View>
         </LinearGradient>
       </View>
     );

@@ -29,6 +29,7 @@ export const ROUTES = {
   STUDENT_CERTIFICATES: 'StudentCertificates',
   PAYMENT: 'Payment',
   PAYMENT_HISTORY: 'PaymentHistory',
+  SESSION_RESULT: 'SessionResult',
 
   // Teacher Main Tabs
   TEACHER_TABS: 'TeacherTabs',
