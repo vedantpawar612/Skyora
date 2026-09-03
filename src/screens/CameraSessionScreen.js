@@ -42,10 +42,9 @@ import { ROUTES } from '../config/navigation';
 
 // ── Session phases ──
 const PHASE = {
-  PRE_SESSION: 'pre_session',     // Before starting (camera preview)
-  GUIDED_SETUP: 'guided_setup',   // Step-by-step voice instructions
+  PRE_SESSION: 'pre_session',     // Before starting: shows steps card + camera preview
   COUNTDOWN: 'countdown',         // 3-2-1 countdown
-  ACTIVE: 'active',               // Live detection
+  ACTIVE: 'active',               // Live detection and accuracy tracking
   COMPLETE: 'complete',           // Session results
 };
 
@@ -171,20 +170,21 @@ const CameraSessionScreen = ({ route, navigation }) => {
           console.log(`[CameraSession] Pose processed! landmarks: ${processed.landmarks?.length}, accuracy: ${processed.comparison?.overallAccuracy}%`);
         }
 
-        const rawAccuracy = processed.comparison?.overallAccuracy || 0;
-        // Smooth displayed accuracy (Fix 7)
-        const smoothedAccuracy = Math.round(
-          0.3 * rawAccuracy + 0.7 * (accuracyRef.current || rawAccuracy)
-        );
-        accuracyRef.current = smoothedAccuracy;
-
         setLandmarks(processed.landmarks);
-        setComparison(processed.comparison);
-        setAccuracy(smoothedAccuracy);
-        setDebugInfo(`✅ #${resultCountRef.current} | LM:${processed.landmarks?.length} | Acc:${smoothedAccuracy || '-'}%`);
 
-        // Only record history and speak during active detection phase
+        // ONLY calculate and track accuracy during ACTIVE detection phase (after steps are shown)
         if (sessionPhaseRef.current === PHASE.ACTIVE) {
+          const rawAccuracy = processed.comparison?.overallAccuracy || 0;
+          // Smooth displayed accuracy (Fix 7)
+          const smoothedAccuracy = Math.round(
+            0.3 * rawAccuracy + 0.7 * (accuracyRef.current || rawAccuracy)
+          );
+          accuracyRef.current = smoothedAccuracy;
+
+          setComparison(processed.comparison);
+          setAccuracy(smoothedAccuracy);
+          setDebugInfo(`✅ #${resultCountRef.current} | LM:${processed.landmarks?.length} | Acc:${smoothedAccuracy || '-'}%`);
+
           accuracyHistory.current.push(smoothedAccuracy);
 
           // Track per-joint accuracy for the session report
@@ -214,6 +214,12 @@ const CameraSessionScreen = ({ route, navigation }) => {
               smoothedAccuracy,
             );
           }
+        } else {
+          // Pre-session or countdown: keep accuracy 0, do not evaluate score
+          setComparison(null);
+          setAccuracy(0);
+          accuracyRef.current = 0;
+          setDebugInfo(`⏳ Positioning body... (#${resultCountRef.current})`);
         }
       } else {
         if (resultCountRef.current <= 10) {
@@ -271,55 +277,25 @@ const CameraSessionScreen = ({ route, navigation }) => {
     stopNoDetectionWatchdog();
   }, [stopNoDetectionWatchdog]);
 
-  // ── PHASE 1: Start Guided Setup ──
-  const startGuidedSetup = useCallback(() => {
+  // ── Start Practice (After steps are shown, straight to countdown) ──
+  const startPractice = useCallback(() => {
     resetSmoother();
-    setSessionPhase(PHASE.GUIDED_SETUP);
-    setCurrentInstructionIndex(0);
     resultCountRef.current = 0;
-    lastResultTimeRef.current = Date.now();
+    accuracyRef.current = 0;
+    setAccuracy(0);
     setNoDetectionMsg('');
+    accuracyHistory.current = [];
+    jointAccuracyHistoryRef.current = {};
+    jointFeedbackCountRef.current = {};
 
-    // Start watching for detection silence
     startNoDetectionWatchdog();
+    startCountdown();
+  }, [startNoDetectionWatchdog, startCountdown]);
 
-    // Announce session start
-    ttsService.speakSessionStart(pose.name);
-
-    // Start speaking instructions after a brief pause for the announcement
-    setTimeout(() => {
-      speakInstructionAtIndex(0);
-    }, 2500);
-  }, [pose, startNoDetectionWatchdog]);
-
-  // Speak instruction at given index, then advance
-  const speakInstructionAtIndex = useCallback((index) => {
-    if (index >= setupInstructions.length) {
-      // All instructions spoken — transition to countdown
-      startCountdown();
-      return;
-    }
-
-    setCurrentInstructionIndex(index);
-
-    const instruction = setupInstructions[index];
-    ttsService.speakInstruction(instruction);
-
-    // Wait for the instruction to be spoken + a pause, then advance
-    // Estimate ~80ms per character for speech + 1.5s pause
-    const estimatedDuration = Math.max(2500, instruction.length * 80 + 1500);
-
-    instructionTimerRef.current = setTimeout(() => {
-      speakInstructionAtIndex(index + 1);
-    }, estimatedDuration);
-  }, [setupInstructions]);
-
-  // ── PHASE 2: Countdown ──
+  // ── Countdown Phase (3-2-1) ──
   const startCountdown = useCallback(() => {
     setSessionPhase(PHASE.COUNTDOWN);
     setCountdownValue(3);
-
-    ttsService.speakPhaseTransition('Hold your pose. Tracking starts now.');
 
     let count = 3;
     countdownTimerRef.current = setInterval(() => {
@@ -332,7 +308,7 @@ const CameraSessionScreen = ({ route, navigation }) => {
         setCountdownValue(count);
       }
     }, 1000);
-  }, []);
+  }, [startActiveDetection]);
 
   // ── PHASE 3: Active Detection ──
   const startActiveDetection = useCallback(() => {
@@ -500,20 +476,6 @@ const CameraSessionScreen = ({ route, navigation }) => {
         />
       )}
 
-      {/* Feedback overlay — Guided Setup phase (Fix 5) */}
-      {sessionPhase === PHASE.GUIDED_SETUP && (
-        <FeedbackOverlay
-          phase="guided_setup"
-          poseName={pose.name}
-          poseThumbnail={pose.thumbnailUrl}
-          accuracy={accuracy}
-          currentInstruction={setupInstructions[currentInstructionIndex] || ''}
-          instructionStep={currentInstructionIndex}
-          totalInstructions={setupInstructions.length}
-          cameraHintText={pose.cameraHintText}
-        />
-      )}
-
       {/* Feedback overlay — Countdown phase */}
       {sessionPhase === PHASE.COUNTDOWN && (
         <FeedbackOverlay
@@ -524,7 +486,7 @@ const CameraSessionScreen = ({ route, navigation }) => {
         />
       )}
 
-      {/* Feedback overlay — Active detection phase (always show during ACTIVE) */}
+      {/* Feedback overlay — Active detection phase (accuracy tracking starts here) */}
       {sessionPhase === PHASE.ACTIVE && (
         <FeedbackOverlay
           phase="active_detection"
@@ -537,7 +499,7 @@ const CameraSessionScreen = ({ route, navigation }) => {
         />
       )}
 
-      {/* Pre-session overlay — shown before starting */}
+      {/* Pre-session overlay — Steps are shown clearly here BEFORE practice begins */}
       {sessionPhase === PHASE.PRE_SESSION && (
         <View style={styles.preSessionOverlay}>
           <View style={styles.preTopBar}>
@@ -545,47 +507,58 @@ const CameraSessionScreen = ({ route, navigation }) => {
               <Ionicons name="arrow-back" size={24} color="#FFF" />
             </TouchableOpacity>
             <Text style={styles.preTitle}>{pose.name}</Text>
-            {/* Flip camera button in pre-session (Fix 10) */}
+            {/* Flip camera button */}
             <TouchableOpacity onPress={() => setCameraFacing(prev => prev === 'front' ? 'back' : 'front')} style={styles.navBtn}>
               <Ionicons name="camera-reverse" size={24} color="#FFF" />
             </TouchableOpacity>
           </View>
-          <View style={styles.preCenterContent}>
+
+          <ScrollView
+            style={styles.preScrollView}
+            contentContainerStyle={styles.preCenterContent}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.preInstructionBox}>
-              <Ionicons name={poseError ? 'warning' : 'body'} size={40} color={poseError ? COLORS.error || '#FF5252' : COLORS.primary} />
-              <Text style={styles.preInstructionTitle}>
-                {poseError ? 'AI Model Error' : isModelReady ? 'Ready to Begin' : 'Loading AI Model...'}
-              </Text>
-              <Text style={styles.preInstructionText}>
-                {poseError
-                  ? `Error: ${poseError}\n\nPlease restart the app or check if the model file is bundled correctly.`
-                  : isModelReady
-                  ? `I'll guide you step by step into ${pose.name}.\nThen I'll track your form in real-time.`
-                  : 'MediaPipe pose detection model is initializing.\nThis may take a few seconds.'
-                }
-              </Text>
-              {/* Camera hint badge (Fix 5) */}
-              {isModelReady && pose.cameraHintText && (
+              <View style={styles.poseHeaderRow}>
+                <Ionicons name="body-outline" size={24} color={COLORS.primary} />
+                <Text style={styles.preInstructionTitle}>How to Perform</Text>
+              </View>
+
+              {/* Step by step instructions shown clearly */}
+              <View style={styles.stepsListContainer}>
+                {setupInstructions.map((instruction, idx) => (
+                  <View key={idx} style={styles.stepItemRow}>
+                    <View style={styles.stepNumberBadge}>
+                      <Text style={styles.stepNumberText}>{idx + 1}</Text>
+                    </View>
+                    <Text style={styles.stepItemText}>{instruction}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Camera hint badge */}
+              {pose.cameraHintText ? (
                 <View style={styles.cameraHintBadge}>
                   <Ionicons name="videocam" size={16} color={COLORS.accent} />
                   <Text style={styles.cameraHintText}>{pose.cameraHintText}</Text>
                 </View>
-              )}
+              ) : null}
             </View>
+
             <GradientButton
-              title={isModelReady ? 'Start Practice' : poseError ? 'Error — Retry' : 'Loading...'}
-              onPress={poseError ? () => { setPoseError(null); } : startGuidedSetup}
+              title={isModelReady ? 'Start Practice' : poseError ? 'Error — Retry' : 'Loading AI Model...'}
+              onPress={poseError ? () => { setPoseError(null); } : startPractice}
               size="large"
               disabled={!isModelReady && !poseError}
               icon={<Ionicons name={isModelReady ? 'play' : poseError ? 'refresh' : 'hourglass'} size={20} color="#FFF" />}
               style={styles.startBtn}
             />
-          </View>
+          </ScrollView>
         </View>
       )}
 
-      {/* Session controls — shown during guided setup, countdown, and active phase */}
-      {(sessionPhase === PHASE.GUIDED_SETUP || sessionPhase === PHASE.COUNTDOWN || sessionPhase === PHASE.ACTIVE) && (
+      {/* Session controls — shown during countdown and active phase */}
+      {(sessionPhase === PHASE.COUNTDOWN || sessionPhase === PHASE.ACTIVE) && (
         <View style={styles.sessionControls}>
           {/* Flip camera button during session (Fix 10) */}
           <TouchableOpacity onPress={() => setCameraFacing(prev => prev === 'front' ? 'back' : 'front')} style={styles.controlBtn}>
@@ -634,10 +607,16 @@ const styles = StyleSheet.create({
   preTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 50, paddingHorizontal: SPACING.md },
   navBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' },
   preTitle: { color: '#FFF', fontSize: FONT_SIZES.lg, ...FONTS.bold },
-  preCenterContent: { alignItems: 'center', paddingBottom: SPACING.xxl * 2 },
-  preInstructionBox: { backgroundColor: 'rgba(10, 14, 33, 0.85)', borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl, alignItems: 'center', marginHorizontal: SPACING.xl, marginBottom: SPACING.xl, borderWidth: 1, borderColor: COLORS.surfaceBorder },
-  preInstructionTitle: { color: COLORS.textPrimary, fontSize: FONT_SIZES.xl, ...FONTS.bold, marginTop: SPACING.md, marginBottom: SPACING.sm },
-  preInstructionText: { color: COLORS.textSecondary, fontSize: FONT_SIZES.body, ...FONTS.regular, textAlign: 'center', lineHeight: 22 },
+  preScrollView: { flex: 1, width: '100%' },
+  preCenterContent: { alignItems: 'center', paddingTop: SPACING.md, paddingBottom: SPACING.xxl * 2 },
+  preInstructionBox: { backgroundColor: 'rgba(10, 14, 33, 0.9)', borderRadius: BORDER_RADIUS.xl, padding: SPACING.lg, marginHorizontal: SPACING.lg, marginBottom: SPACING.lg, borderWidth: 1, borderColor: COLORS.surfaceBorder, width: width - SPACING.lg * 2 },
+  poseHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md, gap: 8 },
+  preInstructionTitle: { color: COLORS.textPrimary, fontSize: FONT_SIZES.lg, ...FONTS.bold },
+  stepsListContainer: { width: '100%', marginBottom: SPACING.sm },
+  stepItemRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10, paddingRight: SPACING.md },
+  stepNumberBadge: { width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(108, 99, 255, 0.25)', alignItems: 'center', justifyContent: 'center', marginRight: 10, marginTop: 1, borderWidth: 1, borderColor: 'rgba(108, 99, 255, 0.5)' },
+  stepNumberText: { color: COLORS.primaryLight || '#A5A6F6', fontSize: 11, fontFamily: FONTS.bold },
+  stepItemText: { flex: 1, color: COLORS.textSecondary, fontSize: FONT_SIZES.sm, ...FONTS.regular, lineHeight: 20 },
   cameraHintBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -645,7 +624,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    marginTop: SPACING.md,
+    marginTop: SPACING.xs,
     borderWidth: 1,
     borderColor: 'rgba(0, 217, 166, 0.25)',
     gap: 8,

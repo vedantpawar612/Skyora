@@ -93,83 +93,9 @@ const FeedbackOverlay = ({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // ── GUIDED SETUP PHASE ──
-  // Renders at TOP + BOTTOM only — the center of the screen stays clear
-  // so the camera feed and skeleton overlay remain visible.
+  // Guided setup phase removed — instructions are now shown upfront on pre-session card
   if (phase === 'guided_setup') {
-    return (
-      <View style={styles.container} pointerEvents="box-none">
-        {/* Top bar — Pose name + step badge */}
-        <Animated.View style={[styles.topBar, { transform: [{ translateY: slideAnim }] }]}>
-          <View style={styles.topBarInner}>
-            <View style={styles.poseInfo}>
-              <Text style={styles.poseName}>{poseName}</Text>
-              <Text style={[styles.statusText, cameraHintText ? { color: COLORS.accent, ...FONTS.medium } : {}]}>
-                {cameraHintText ? `📷 ${cameraHintText}` : 'Getting into position...'}
-              </Text>
-            </View>
-            <View style={styles.stepBadge}>
-              <Text style={styles.stepBadgeText}>
-                {instructionStep + 1}/{totalInstructions}
-              </Text>
-            </View>
-          </View>
-        </Animated.View>
-
-        {/* Pose reference thumbnail — top-right corner below top bar */}
-        {poseThumbnail ? (
-          <View style={styles.poseThumbnailContainer}>
-            <Image
-              source={{ uri: poseThumbnail }}
-              style={styles.poseThumbnail}
-              resizeMode="cover"
-            />
-            <Text style={styles.poseThumbnailLabel}>Target Pose</Text>
-          </View>
-        ) : null}
-
-        {/* Live accuracy badge — shown in mid-right if we have readings */}
-        {accuracy > 0 && (
-          <View style={styles.setupAccuracyBadge}>
-            <Text style={[styles.setupAccuracyValue, { color: getAccuracyColor(accuracy) }]}>
-              {accuracy}%
-            </Text>
-            <Text style={styles.setupAccuracyLabel}>Accuracy</Text>
-          </View>
-        )}
-
-        {/* Bottom instruction card — sits at bottom so camera/skeleton stay visible */}
-        <View style={styles.guidedBottom}>
-          <View style={styles.instructionCardBottom}>
-            <View style={styles.instructionRowCompact}>
-              <View style={styles.instructionIconCircleSmall}>
-                <Ionicons name="body" size={20} color={COLORS.primary} />
-              </View>
-              <View style={styles.instructionContentCompact}>
-                <Text style={styles.instructionStepLabelSmall}>
-                  Step {instructionStep + 1} of {totalInstructions}
-                </Text>
-                <Text style={styles.instructionTextCompact}>
-                  {currentInstruction}
-                </Text>
-              </View>
-            </View>
-            {/* Progress dots */}
-            <View style={styles.progressDots}>
-              {Array.from({ length: totalInstructions }).map((_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.progressDot,
-                    i <= instructionStep && styles.progressDotActive,
-                  ]}
-                />
-              ))}
-            </View>
-          </View>
-        </View>
-      </View>
-    );
+    return null;
   }
 
   // ── COUNTDOWN PHASE ──

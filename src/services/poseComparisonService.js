@@ -104,35 +104,59 @@ function calculateJointAccuracy(deviation, tolerance = ANGLE_THRESHOLD) {
  * @param {Object} [tolerances] - Optional per-joint tolerances.
  * @returns {Object} Comparison results with accuracy and feedback
  */
-export const comparePose = (userAngles, targetAngles, jointWeights = null, tolerances = null, customFeedback = null) => {
+export const comparePose = (userAngles, targetAngles, jointWeights = null, tolerances = null, customFeedback = null, bodyVisibilityInfo = null) => {
   if (!userAngles || !targetAngles) {
     return {
       overallAccuracy: 0,
       jointResults: {},
       feedback: ['Position yourself in the camera frame'],
       primaryFeedback: 'Position yourself in the camera frame',
+      isFullBodyVisible: false,
+    };
+  }
+
+  // If key body landmarks (shoulders, hips, legs) are not in frame, do NOT award false accuracy
+  if (bodyVisibilityInfo && !bodyVisibilityInfo.isFullBody) {
+    return {
+      overallAccuracy: 0,
+      jointResults: {},
+      feedback: [bodyVisibilityInfo.summary || 'Step back so your full body is visible'],
+      primaryFeedback: bodyVisibilityInfo.summary || 'Step back so your full body is visible in the camera',
+      isFullBodyVisible: false,
     };
   }
 
   const jointResults = {};
   let weightedAccuracySum = 0;
   let weightSum = 0;
+  let detectedJointsCount = 0;
+  const totalTargetJoints = Object.keys(targetAngles).length;
   const feedbackList = [];
 
   for (const [jointName, targetAngle] of Object.entries(targetAngles)) {
     const userAngle = userAngles[jointName];
+    const weight = (jointWeights && jointWeights[jointName]) || 1.0;
 
-    // Explicitly check for null/undefined (Fix 2: Low visibility / invalid points return null)
-    if (userAngle === undefined || userAngle === null) continue;
+    // If joint landmark was not detected or off-screen, penalize it as 0% accuracy
+    if (userAngle === undefined || userAngle === null) {
+      jointResults[jointName] = {
+        userAngle: null,
+        targetAngle,
+        deviation: null,
+        accuracy: 0,
+        status: 'bad',
+        weight,
+      };
+      weightSum += weight; // Denominator still includes weight so partial views don't inflate score
+      continue;
+    }
 
+    detectedJointsCount++;
     const tolerance = (tolerances && tolerances[jointName]) || ANGLE_THRESHOLD;
     const closeTolerance = tolerance * 1.6;
 
     const deviation = Math.abs(userAngle - targetAngle);
     const accuracy = Math.max(0, Math.round(calculateJointAccuracy(deviation, tolerance)));
-
-    // Joint importance weight (default 1.0 if not specified)
-    const weight = (jointWeights && jointWeights[jointName]) || 1.0;
 
     let status = 'good';
     if (deviation > closeTolerance) {
@@ -180,6 +204,18 @@ export const comparePose = (userAngles, targetAngles, jointWeights = null, toler
 
     weightedAccuracySum += accuracy * weight;
     weightSum += weight;
+  }
+
+  // If fewer than 50% of the target joints are in the camera view (e.g. only face or arms visible),
+  // do not calculate a partial high score — prompt user to step back
+  if (detectedJointsCount < Math.ceil(totalTargetJoints * 0.5)) {
+    return {
+      overallAccuracy: 0,
+      jointResults,
+      feedback: ['Step back so your full body is visible in the camera'],
+      primaryFeedback: 'Step back so your full body is visible in the camera',
+      isFullBodyVisible: false,
+    };
   }
 
   // Sort feedback by priority (highest weighted deviation first)

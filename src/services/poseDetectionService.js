@@ -16,7 +16,7 @@
 //   2. SkeletonOverlay already handles normalized→screen conversion
 
 import { Platform, Dimensions, View } from 'react-native';
-import { calculateAllAngles, LANDMARK_INDICES, SKELETON_CONNECTIONS } from './angleCalculator';
+import { calculateAllAngles, checkFullBodyVisibility, LANDMARK_INDICES, SKELETON_CONNECTIONS } from './angleCalculator';
 import { comparePose } from './poseComparisonService';
 import LandmarkSmoother from './landmarkSmoother';
 
@@ -175,6 +175,11 @@ export function processPoseResults(results, viewCoordinator, targetAngles, joint
   // Convert raw landmarks to screen space using the view coordinator
   // to resolve native orientation, rotation, and aspect ratio.
   const landmarks = rawLandmarks.map((lm) => {
+    // Verify whether the raw normalized landmark is physically inside the camera frame
+    const isOnScreen = lm.x >= -0.05 && lm.x <= 1.05 && lm.y >= -0.05 && lm.y <= 1.05;
+    const rawVis = lm.visibility ?? lm.presence ?? (isOnScreen ? 0.9 : 0.0);
+    const effectiveVisibility = isOnScreen ? rawVis : 0.0;
+
     if (viewCoordinator && typeof viewCoordinator.convertPoint === 'function') {
       const converted = viewCoordinator.convertPoint(frameDims, { x: lm.x, y: lm.y });
       // Scale z by viewSize width to maintain uniform 3D proportions in screen pixels
@@ -183,28 +188,35 @@ export function processPoseResults(results, viewCoordinator, targetAngles, joint
         x: converted.x,
         y: converted.y,
         z: (lm.z || 0) * zScale,
-        visibility: lm.visibility ?? 0.99,
+        visibility: effectiveVisibility,
+        normalizedX: lm.x,
+        normalizedY: lm.y,
       };
     }
     return {
       x: lm.x,
       y: lm.y,
       z: lm.z || 0,
-      visibility: lm.visibility ?? 0.99,
+      visibility: effectiveVisibility,
+      normalizedX: lm.x,
+      normalizedY: lm.y,
     };
   });
 
   // Apply EMA smoothing to reduce jitter
   const smoothedLandmarks = landmarkSmoother.smooth(landmarks);
 
-  // Calculate joint angles from detected landmarks
+  // Check if user's full body is actually visible in the camera frame
+  const bodyVisibility = checkFullBodyVisibility(smoothedLandmarks);
+
+  // Calculate joint angles from detected landmarks (only valid on-screen points)
   const angles = calculateAllAngles(smoothedLandmarks);
 
-  // Compare with target pose if provided (now with optional weights, tolerances, and custom feedback)
+  // Compare with target pose if provided
   // NOTE: comparison may be null if angles couldn't be computed,
   // but we still return landmarks so the skeleton can draw.
   const comparison = (angles && targetAngles)
-    ? comparePose(angles, targetAngles, jointWeights, tolerances, customFeedback)
+    ? comparePose(angles, targetAngles, jointWeights, tolerances, customFeedback, bodyVisibility)
     : null;
 
   if (angles) {

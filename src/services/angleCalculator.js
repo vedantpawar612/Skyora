@@ -13,9 +13,23 @@
 export const calculateAngle = (pointA, pointB, pointC) => {
   if (!pointA || !pointB || !pointC) return null;
 
-  // Skip low-visibility landmarks (threshold 0.5)
-  const minVis = Math.min(pointA.visibility ?? 1, pointB.visibility ?? 1, pointC.visibility ?? 1);
-  if (minVis < 0.5) return null;
+  // Verify all 3 points are within the visible frame (prevent off-screen phantom joints)
+  const isPointInFrame = (pt) => {
+    // If normalized coords are available, check [0..1] range
+    if (pt.normalizedX !== undefined && pt.normalizedY !== undefined) {
+      if (pt.normalizedX < -0.05 || pt.normalizedX > 1.05 ||
+          pt.normalizedY < -0.05 || pt.normalizedY > 1.05) {
+        return false;
+      }
+    }
+    // Check visibility score (must be >= 0.5)
+    const vis = pt.visibility ?? 1;
+    return vis >= 0.5;
+  };
+
+  if (!isPointInFrame(pointA) || !isPointInFrame(pointB) || !isPointInFrame(pointC)) {
+    return null;
+  }
 
   const vectorBA = {
     x: pointA.x - pointB.x,
@@ -147,6 +161,63 @@ export const calculateAllAngles = (landmarks) => {
       landmarks[L.RIGHT_HIP],
       landmarks[L.RIGHT_KNEE]
     ),
+  };
+};
+
+/**
+ * Check whether essential body parts are inside the frame and visible.
+ * Prevents false detections when only face/shoulders are shown.
+ *
+ * @param {Array} landmarks - 33 landmarks with normalized x,y and visibility
+ * @returns {{ isFullBody: boolean, missingParts: string[], summary: string }}
+ */
+export const checkFullBodyVisibility = (landmarks) => {
+  if (!landmarks || landmarks.length < 33) {
+    return { isFullBody: false, missingParts: ['full body'], summary: 'Position yourself in the camera' };
+  }
+
+  const L = LANDMARK_INDICES;
+  const VIS_THRESH = 0.5;
+
+  const isPointInFrame = (pt) => {
+    if (!pt) return false;
+    if (pt.normalizedX !== undefined && pt.normalizedY !== undefined) {
+      if (pt.normalizedX < -0.05 || pt.normalizedX > 1.05 ||
+          pt.normalizedY < -0.05 || pt.normalizedY > 1.05) {
+        return false;
+      }
+    }
+    const vis = pt.visibility ?? 1;
+    return vis >= VIS_THRESH;
+  };
+
+  const hasShoulders = isPointInFrame(landmarks[L.LEFT_SHOULDER]) || isPointInFrame(landmarks[L.RIGHT_SHOULDER]);
+  const hasHips = isPointInFrame(landmarks[L.LEFT_HIP]) || isPointInFrame(landmarks[L.RIGHT_HIP]);
+  const hasKnees = isPointInFrame(landmarks[L.LEFT_KNEE]) || isPointInFrame(landmarks[L.RIGHT_KNEE]);
+  const hasAnkles = isPointInFrame(landmarks[L.LEFT_ANKLE]) || isPointInFrame(landmarks[L.RIGHT_ANKLE]);
+
+  const missingParts = [];
+  if (!hasShoulders) missingParts.push('shoulders');
+  if (!hasHips) missingParts.push('hips');
+  if (!hasKnees) missingParts.push('knees');
+  if (!hasAnkles) missingParts.push('feet');
+
+  // Full body requires shoulders, hips, and at least knees or feet in view
+  const isFullBody = hasShoulders && hasHips && (hasKnees || hasAnkles);
+
+  let summary = '';
+  if (!isFullBody) {
+    if (!hasHips || (!hasKnees && !hasAnkles)) {
+      summary = 'Step back so your full body is visible in the camera';
+    } else {
+      summary = `Ensure your ${missingParts.join(' and ')} are in the frame`;
+    }
+  }
+
+  return {
+    isFullBody,
+    missingParts,
+    summary,
   };
 };
 
