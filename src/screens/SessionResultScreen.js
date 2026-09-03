@@ -1,7 +1,7 @@
 // Session Result Screen — Post-session AI training report
 // Shows detailed breakdown of accuracy, per-joint analysis,
 // improvement tips, and accuracy timeline after a training session.
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, StatusBar,
   Dimensions, TouchableOpacity,
@@ -12,11 +12,24 @@ import { COLORS, BORDER_RADIUS, FONT_SIZES, FONTS, SPACING } from '../config/the
 import { ROUTES } from '../config/navigation';
 import GradientButton from '../components/GradientButton';
 import { JOINT_PAIRS, getJointImprovementTip, getPerformanceMessage } from '../data/sessionFeedback';
+import { saveSessionRecord } from '../services/sessionStorage';
 
 const { width } = Dimensions.get('window');
 
 const SessionResultScreen = ({ route, navigation }) => {
   const { sessionReport } = route.params;
+  const [isSaved, setIsSaved] = useState(false);
+
+  // Auto-save session to history
+  useEffect(() => {
+    let mounted = true;
+    if (sessionReport) {
+      saveSessionRecord(sessionReport).then(() => {
+        if (mounted) setIsSaved(true);
+      });
+    }
+    return () => { mounted = false; };
+  }, [sessionReport]);
   const {
     pose,
     avgAccuracy,
@@ -108,6 +121,12 @@ const SessionResultScreen = ({ route, navigation }) => {
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Session Report</Text>
             <Text style={styles.headerSubtitle}>{pose.name}</Text>
+            {isSaved && (
+              <View style={styles.savedBadge}>
+                <Ionicons name="checkmark-circle" size={14} color="#00E676" />
+                <Text style={styles.savedText}>Saved to Progress</Text>
+              </View>
+            )}
           </View>
 
           {/* ── Overall Score ── */}
@@ -329,6 +348,21 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.medium,
     color: COLORS.textSecondary,
     marginTop: 4,
+  },
+  savedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 230, 118, 0.1)',
+    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 3,
+    marginTop: 6,
+  },
+  savedText: {
+    fontSize: FONT_SIZES.xs,
+    fontFamily: FONTS.medium,
+    color: '#00E676',
+    marginLeft: 4,
   },
 
   // Score section

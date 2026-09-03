@@ -1,16 +1,19 @@
 // Progress Dashboard Screen - Stats, charts, and session history
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Animated, StatusBar, Dimensions,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Polyline, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { COLORS, BORDER_RADIUS, FONT_SIZES, FONTS, SPACING, SHADOWS } from '../config/theme';
+import { ROUTES } from '../config/navigation';
 import StatCard from '../components/StatCard';
 import { YOGA_POSES } from '../data/poses';
 import { formatDate, calculateAccuracyColor } from '../utils/helpers';
+import { getSessionHistory } from '../services/sessionStorage';
 
 const { width } = Dimensions.get('window');
 const CHART_WIDTH = width - SPACING.lg * 2 - SPACING.md * 2;
@@ -29,14 +32,41 @@ const DEMO_PROGRESS = [
 
 const ProgressScreen = ({ navigation }) => {
   const [selectedPeriod, setSelectedPeriod] = useState('Week');
+  const [savedSessions, setSavedSessions] = useState([]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const chartAnim = useRef(new Animated.Value(0)).current;
 
-  const progress = DEMO_PROGRESS;
+  // Load real saved sessions on screen focus
+  useFocusEffect(
+    useCallback(() => {
+      getSessionHistory().then(sessions => {
+        if (sessions && Array.isArray(sessions)) {
+          setSavedSessions(sessions);
+        }
+      });
+    }, [])
+  );
+
+  // Combine real saved sessions (newest first) with demo data
+  const progress = savedSessions.length > 0
+    ? [
+        ...savedSessions.map(s => ({
+          id: s.id,
+          poseId: s.poseId,
+          accuracy: s.accuracy,
+          duration: s.duration,
+          timestamp: new Date(s.timestamp),
+          isReal: true,
+          fullReport: s,
+        })),
+        ...DEMO_PROGRESS.slice(0, Math.max(0, 7 - savedSessions.length)),
+      ]
+    : DEMO_PROGRESS;
+
   const totalSessions = progress.length;
-  const avgAccuracy = Math.round(progress.reduce((s, p) => s + p.accuracy, 0) / totalSessions);
+  const avgAccuracy = totalSessions > 0 ? Math.round(progress.reduce((s, p) => s + p.accuracy, 0) / totalSessions) : 0;
   const totalDuration = progress.reduce((s, p) => s + p.duration, 0);
-  const bestAccuracy = Math.max(...progress.map(p => p.accuracy));
+  const bestAccuracy = totalSessions > 0 ? Math.max(...progress.map(p => p.accuracy)) : 0;
 
   useEffect(() => {
     Animated.parallel([
@@ -47,7 +77,7 @@ const ProgressScreen = ({ navigation }) => {
 
   // Build chart data
   const chartData = progress.map((p, i) => ({
-    x: (i / (progress.length - 1)) * CHART_WIDTH,
+    x: progress.length > 1 ? (i / (progress.length - 1)) * CHART_WIDTH : CHART_WIDTH / 2,
     y: CHART_HEIGHT - (p.accuracy / 100) * CHART_HEIGHT,
     accuracy: p.accuracy,
     date: p.timestamp,
@@ -204,44 +234,83 @@ const ProgressScreen = ({ navigation }) => {
 
             {/* Session History */}
             <Text style={styles.sectionTitle}>Session History</Text>
-            {progress.slice().reverse().map((session, index) => {
+            {progress.slice().map((session, index) => {
               const accColor = calculateAccuracyColor(session.accuracy);
+              const poseObj = YOGA_POSES.find(p => p.id === session.poseId) || {
+                id: session.poseId,
+                name: session.fullReport?.poseName || getPoseName(session.poseId),
+              };
+              const isClickable = !!session.fullReport;
+
               return (
-                <Animated.View
+                <TouchableOpacity
                   key={session.id}
-                  style={[
-                    styles.sessionCard,
-                    {
-                      opacity: fadeAnim,
-                      transform: [{
-                        translateX: fadeAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [-30, 0],
-                        }),
-                      }],
-                    },
-                  ]}
+                  activeOpacity={isClickable ? 0.7 : 1}
+                  onPress={() => {
+                    if (isClickable) {
+                      navigation.navigate(ROUTES.SESSION_RESULT, {
+                        sessionReport: {
+                          pose: poseObj,
+                          avgAccuracy: session.fullReport.accuracy,
+                          finalPoseAccuracy: session.fullReport.finalPoseAccuracy,
+                          startingAccuracy: session.fullReport.startingAccuracy,
+                          peakAccuracy: session.fullReport.peakAccuracy,
+                          sessionDuration: session.fullReport.duration,
+                          totalReadings: session.fullReport.totalReadings,
+                          accuracyTimeline: session.fullReport.accuracyTimeline || [],
+                          jointBreakdown: session.fullReport.jointBreakdown || {},
+                          lastJointResults: {},
+                          jointFeedbackCount: session.fullReport.jointFeedbackCount || {},
+                        },
+                      });
+                    }
+                  }}
                 >
-                  <View style={[styles.sessionAccuracyBar, { backgroundColor: accColor }]} />
-                  <View style={styles.sessionContent}>
-                    <View style={styles.sessionInfo}>
-                      <Text style={styles.sessionPose}>{getPoseName(session.poseId)}</Text>
-                      <Text style={styles.sessionDate}>{formatDate(session.timestamp)}</Text>
-                    </View>
-                    <View style={styles.sessionMeta}>
-                      <View style={styles.sessionMetaItem}>
-                        <Text style={[styles.sessionAccuracy, { color: accColor }]}>
-                          {session.accuracy}%
-                        </Text>
-                        <Text style={styles.sessionMetaLabel}>Accuracy</Text>
+                  <Animated.View
+                    style={[
+                      styles.sessionCard,
+                      {
+                        opacity: fadeAnim,
+                        transform: [{
+                          translateX: fadeAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-30, 0],
+                          }),
+                        }],
+                      },
+                    ]}
+                  >
+                    <View style={[styles.sessionAccuracyBar, { backgroundColor: accColor }]} />
+                    <View style={styles.sessionContent}>
+                      <View style={styles.sessionInfo}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Text style={styles.sessionPose}>{getPoseName(session.poseId)}</Text>
+                          {session.isReal && (
+                            <View style={styles.realBadge}>
+                              <Text style={styles.realBadgeText}>AI Report</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.sessionDate}>{formatDate(session.timestamp)}</Text>
                       </View>
-                      <View style={styles.sessionMetaItem}>
-                        <Text style={styles.sessionDuration}>{session.duration}s</Text>
-                        <Text style={styles.sessionMetaLabel}>Duration</Text>
+                      <View style={styles.sessionMeta}>
+                        <View style={styles.sessionMetaItem}>
+                          <Text style={[styles.sessionAccuracy, { color: accColor }]}>
+                            {session.accuracy}%
+                          </Text>
+                          <Text style={styles.sessionMetaLabel}>Accuracy</Text>
+                        </View>
+                        <View style={styles.sessionMetaItem}>
+                          <Text style={styles.sessionDuration}>{session.duration}s</Text>
+                          <Text style={styles.sessionMetaLabel}>Duration</Text>
+                        </View>
+                        {isClickable && (
+                          <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} style={{ marginLeft: 6 }} />
+                        )}
                       </View>
                     </View>
-                  </View>
-                </Animated.View>
+                  </Animated.View>
+                </TouchableOpacity>
               );
             })}
 
@@ -376,6 +445,20 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xs,
     ...FONTS.regular,
     marginTop: 2,
+  },
+  realBadge: {
+    backgroundColor: 'rgba(108, 99, 255, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginLeft: 6,
+    borderWidth: 0.5,
+    borderColor: 'rgba(108, 99, 255, 0.4)',
+  },
+  realBadgeText: {
+    fontSize: 9,
+    fontFamily: FONTS.medium,
+    color: COLORS.primaryLight || '#A5A6F6',
   },
   sessionMeta: {
     flexDirection: 'row',
