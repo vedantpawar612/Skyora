@@ -9,7 +9,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar,
-  Dimensions, Animated, Platform,
+  Dimensions, Animated, Platform, ScrollView,
 } from 'react-native';
 let useCameraPermission = () => ({ hasPermission: true, requestPermission: async () => true });
 
