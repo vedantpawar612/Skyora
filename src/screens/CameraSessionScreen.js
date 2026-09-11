@@ -414,7 +414,7 @@ const CameraSessionScreen = ({ route, navigation }) => {
         <StatusBar barStyle="light-content" />
         <LinearGradient colors={[COLORS.background, COLORS.backgroundLight]} style={styles.gradient}>
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={{ color: COLORS.textPrimary, fontFamily: FONTS.medium, fontSize: FONT_SIZES.lg }}>
+            <Text style={{ color: COLORS.textPrimary, ...FONTS.medium, fontSize: FONT_SIZES.lg }}>
               Preparing your report...
             </Text>
           </View>
@@ -615,7 +615,7 @@ const styles = StyleSheet.create({
   stepsListContainer: { width: '100%', marginBottom: SPACING.sm },
   stepItemRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10, paddingRight: SPACING.md },
   stepNumberBadge: { width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(108, 99, 255, 0.25)', alignItems: 'center', justifyContent: 'center', marginRight: 10, marginTop: 1, borderWidth: 1, borderColor: 'rgba(108, 99, 255, 0.5)' },
-  stepNumberText: { color: COLORS.primaryLight || '#A5A6F6', fontSize: 11, fontFamily: FONTS.bold },
+  stepNumberText: { color: COLORS.primaryLight || '#A5A6F6', fontSize: 11, ...FONTS.bold },
   stepItemText: { flex: 1, color: COLORS.textSecondary, fontSize: FONT_SIZES.sm, ...FONTS.regular, lineHeight: 20 },
   cameraHintBadge: {
     flexDirection: 'row',

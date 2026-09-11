@@ -340,12 +340,12 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: FONT_SIZES.xl,
-    fontFamily: FONTS.bold,
+    ...FONTS.bold,
     color: COLORS.textPrimary,
   },
   headerSubtitle: {
     fontSize: FONT_SIZES.md,
-    fontFamily: FONTS.medium,
+    ...FONTS.medium,
     color: COLORS.textSecondary,
     marginTop: 4,
   },
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
   },
   savedText: {
     fontSize: FONT_SIZES.xs,
-    fontFamily: FONTS.medium,
+    ...FONTS.medium,
     color: '#00E676',
     marginLeft: 4,
   },
@@ -384,24 +384,24 @@ const styles = StyleSheet.create({
   },
   scoreValue: {
     fontSize: 36,
-    fontFamily: FONTS.bold,
+    ...FONTS.bold,
     color: '#FFF',
   },
   scoreLabel: {
     fontSize: FONT_SIZES.sm,
-    fontFamily: FONTS.medium,
+    ...FONTS.medium,
     color: 'rgba(255,255,255,0.8)',
     marginTop: -2,
   },
   performanceTitle: {
     fontSize: FONT_SIZES.xl,
-    fontFamily: FONTS.bold,
+    ...FONTS.bold,
     color: COLORS.textPrimary,
     marginTop: SPACING.md,
   },
   performanceSubtitle: {
     fontSize: FONT_SIZES.sm,
-    fontFamily: FONTS.regular,
+    ...FONTS.regular,
     color: COLORS.textSecondary,
     marginTop: 4,
   },
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: FONT_SIZES.md,
-    fontFamily: FONTS.bold,
+    ...FONTS.bold,
     color: COLORS.textPrimary,
     marginBottom: SPACING.md,
   },
@@ -434,13 +434,13 @@ const styles = StyleSheet.create({
   },
   improvementLabel: {
     fontSize: FONT_SIZES.xs,
-    fontFamily: FONTS.medium,
+    ...FONTS.medium,
     color: COLORS.textSecondary,
     marginBottom: 4,
   },
   improvementValue: {
     fontSize: 28,
-    fontFamily: FONTS.bold,
+    ...FONTS.bold,
   },
   improvementArrow: {
     alignItems: 'center',
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   },
   improvementDelta: {
     fontSize: FONT_SIZES.sm,
-    fontFamily: FONTS.bold,
+    ...FONTS.bold,
     marginTop: 2,
   },
 
@@ -464,13 +464,13 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: FONT_SIZES.lg,
-    fontFamily: FONTS.bold,
+    ...FONTS.bold,
     color: COLORS.textPrimary,
     marginTop: 4,
   },
   statLabel: {
     fontSize: FONT_SIZES.xs,
-    fontFamily: FONTS.regular,
+    ...FONTS.regular,
     color: COLORS.textSecondary,
     marginTop: 2,
   },
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
   },
   jointName: {
     fontSize: FONT_SIZES.sm,
-    fontFamily: FONTS.medium,
+    ...FONTS.medium,
     color: COLORS.textPrimary,
     marginLeft: 8,
   },
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
   },
   jointAccuracy: {
     fontSize: FONT_SIZES.sm,
-    fontFamily: FONTS.bold,
+    ...FONTS.bold,
     marginLeft: 10,
     width: 42,
     textAlign: 'right',
@@ -541,24 +541,24 @@ const styles = StyleSheet.create({
   },
   improveTipJoint: {
     fontSize: FONT_SIZES.sm,
-    fontFamily: FONTS.bold,
+    ...FONTS.bold,
     color: COLORS.textPrimary,
     marginLeft: 6,
     flex: 1,
   },
   improveTipAcc: {
     fontSize: FONT_SIZES.sm,
-    fontFamily: FONTS.bold,
+    ...FONTS.bold,
   },
   improveTipText: {
     fontSize: FONT_SIZES.sm,
-    fontFamily: FONTS.regular,
+    ...FONTS.regular,
     color: COLORS.textSecondary,
     lineHeight: 20,
   },
   improveTipExercises: {
     fontSize: FONT_SIZES.xs,
-    fontFamily: FONTS.regular,
+    ...FONTS.regular,
     color: COLORS.textTertiary || COLORS.textSecondary,
     marginTop: 6,
     opacity: 0.8,
@@ -577,7 +577,7 @@ const styles = StyleSheet.create({
   },
   chartYLabel: {
     fontSize: 10,
-    fontFamily: FONTS.regular,
+    ...FONTS.regular,
     color: COLORS.textSecondary,
   },
   chartArea: {
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
   },
   chartXLabel: {
     fontSize: 10,
-    fontFamily: FONTS.regular,
+    ...FONTS.regular,
     color: COLORS.textSecondary,
   },
 

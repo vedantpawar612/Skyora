@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
   },
   realBadgeText: {
     fontSize: 9,
-    fontFamily: FONTS.medium,
+    ...FONTS.medium,
     color: COLORS.primaryLight || '#A5A6F6',
   },
   sessionMeta: {
