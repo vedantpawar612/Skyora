@@ -89,6 +89,11 @@ const CameraSessionScreen = ({ route, navigation }) => {
   // Countdown state
   const [countdownValue, setCountdownValue] = useState(3);
 
+  // Web camera & pose state
+  const videoRef = useRef(null);
+  const [webCameraStatus, setWebCameraStatus] = useState(Platform.OS === 'web' ? 'init' : 'active');
+  const [webModelLoading, setWebModelLoading] = useState(Platform.OS === 'web');
+
   const timerRef = useRef(null);
   const accuracyHistory = useRef([]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -253,6 +258,134 @@ const CameraSessionScreen = ({ route, navigation }) => {
     }
   }, [poseDetection.frameProcessor]);
 
+  // ── Web Camera & MediaPipe Pose Pipeline ──
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    let stream = null;
+    let poseInstance = null;
+    let animFrame = null;
+    let cancelled = false;
+
+    const initWebCameraAndPose = async () => {
+      try {
+        setWebCameraStatus('requesting');
+        const constraints = {
+          video: {
+            facingMode: cameraFacing === 'front' ? 'user' : 'environment',
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+          },
+          audio: false,
+        };
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (cancelled) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          try {
+            await videoRef.current.play();
+          } catch (e) {
+            console.warn('[CameraSession] Video play error:', e);
+          }
+        }
+        setWebCameraStatus('active');
+
+        // Dynamically load Google MediaPipe Pose for Web
+        setWebModelLoading(true);
+        if (typeof window !== 'undefined' && !window.Pose) {
+          await new Promise((resolve, reject) => {
+            const existingScript = document.querySelector('script[src*="@mediapipe/pose"]');
+            if (existingScript) {
+              existingScript.addEventListener('load', resolve);
+              existingScript.addEventListener('error', reject);
+              return;
+            }
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js';
+            script.crossOrigin = 'anonymous';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+          });
+        }
+
+        if (cancelled) return;
+
+        if (typeof window !== 'undefined' && window.Pose) {
+          poseInstance = new window.Pose({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+          });
+
+          poseInstance.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            enableSegmentation: false,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5,
+          });
+
+          poseInstance.onResults((results) => {
+            if (cancelled) return;
+            poseCallbacks.onResults(results);
+          });
+
+          setWebModelLoading(false);
+          setIsModelReady(true);
+
+          // Frame inference loop (~15 FPS)
+          let processing = false;
+          let lastSendTime = 0;
+          const loop = async () => {
+            if (cancelled) return;
+            const now = Date.now();
+            if (
+              videoRef.current &&
+              videoRef.current.readyState >= 2 &&
+              !videoRef.current.paused &&
+              !processing &&
+              poseInstance &&
+              now - lastSendTime >= 65
+            ) {
+              processing = true;
+              lastSendTime = now;
+              try {
+                await poseInstance.send({ image: videoRef.current });
+              } catch (err) {
+                // Ignore single frame inference errors
+              } finally {
+                processing = false;
+              }
+            }
+            animFrame = requestAnimationFrame(loop);
+          };
+
+          animFrame = requestAnimationFrame(loop);
+        }
+      } catch (err) {
+        console.warn('[CameraSession] Web camera/pose init error:', err);
+        setWebCameraStatus('denied');
+        setWebModelLoading(false);
+      }
+    };
+
+    initWebCameraAndPose();
+
+    return () => {
+      cancelled = true;
+      if (animFrame) cancelAnimationFrame(animFrame);
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+      if (poseInstance && typeof poseInstance.close === 'function') {
+        try { poseInstance.close(); } catch (e) {}
+      }
+    };
+  }, [cameraFacing, poseCallbacks]);
+
   useEffect(() => {
     console.log('[CameraSession] Component MOUNTED');
     Animated.timing(fadeAnim, {
@@ -389,16 +522,22 @@ const CameraSessionScreen = ({ route, navigation }) => {
   };
 
   // Permission not granted
-  if (!hasPermission) {
+  if (!hasPermission || (Platform.OS === 'web' && webCameraStatus === 'denied')) {
     return (
       <View style={styles.permissionContainer}>
         <LinearGradient colors={[COLORS.background, COLORS.backgroundLight]} style={styles.gradient}>
           <Ionicons name="camera-outline" size={64} color={COLORS.primary} />
           <Text style={styles.permissionTitle}>Camera Access Required</Text>
           <Text style={styles.permissionText}>
-            We need camera access to detect your yoga poses and provide real-time AI feedback.
+            {Platform.OS === 'web'
+              ? 'Please allow camera access in your browser to start your AI practice session. If prompted, tap "Allow", or check your browser site permissions.'
+              : 'We need camera access to detect your yoga poses and provide real-time AI feedback.'}
           </Text>
-          <GradientButton title="Grant Camera Access" onPress={requestPermission} style={{ marginTop: SPACING.lg }} />
+          <GradientButton
+            title={Platform.OS === 'web' ? "Retry Camera" : "Grant Camera Access"}
+            onPress={Platform.OS === 'web' ? () => { if (typeof window !== 'undefined') window.location.reload(); } : requestPermission}
+            style={{ marginTop: SPACING.lg }}
+          />
           <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: SPACING.lg }}>
             <Text style={styles.cancelText}>Go Back</Text>
           </TouchableOpacity>
@@ -424,19 +563,44 @@ const CameraSessionScreen = ({ route, navigation }) => {
   }
 
   // Main camera session view
-  // Uses MediapipeCamera which properly handles the camera-detector
-  // lifecycle (device changes, orientation, frame processor binding)
+  // Uses MediapipeCamera on Native and HTML5 <video> on Web
   return (
     <View style={styles.container}>
       <StatusBar hidden />
 
-      {/* Camera rendered by the library's component (Fix 10) */}
-      <MediapipeCamera
-        style={styles.camera}
-        solution={poseDetection}
-        activeCamera={cameraFacing}
-        resizeMode="cover"
-      />
+      {/* Camera: HTML5 Video on Web or MediapipeCamera on Native */}
+      {Platform.OS === 'web' ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform: cameraFacing === 'front' ? 'scaleX(-1)' : 'none',
+            backgroundColor: '#000',
+          }}
+        />
+      ) : (
+        <MediapipeCamera
+          style={styles.camera}
+          solution={poseDetection}
+          activeCamera={cameraFacing}
+          resizeMode="cover"
+        />
+      )}
+
+      {/* Web AI Model Loading Banner */}
+      {Platform.OS === 'web' && webModelLoading && (
+        <View style={styles.webModelLoadingBadge}>
+          <Text style={styles.webModelLoadingText}>⚡ Loading AI Pose Engine...</Text>
+        </View>
+      )}
 
       {/* Skeleton preview before session (semi-transparent to confirm detection) */}
       {sessionPhase === PHASE.PRE_SESSION && landmarks && (
@@ -653,6 +817,21 @@ const styles = StyleSheet.create({
   resultBtn: { width: '100%' },
   debugBar: { position: 'absolute', bottom: 4, left: 4, right: 100, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
   debugText: { color: '#0F0', fontSize: 9, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  webModelLoadingBadge: {
+    position: 'absolute',
+    top: 90,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(108, 99, 255, 0.85)',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.round,
+    zIndex: 100,
+  },
+  webModelLoadingText: {
+    color: '#FFF',
+    fontSize: FONT_SIZES.xs,
+    ...FONTS.medium,
+  },
 });
 
 export default CameraSessionScreen;

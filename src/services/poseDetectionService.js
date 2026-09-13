@@ -96,6 +96,11 @@ const DEFAULT_POSE_OPTIONS = {
 function extractLandmarks(results) {
   if (!results) return null;
 
+  // Web MediaPipe Pose output: results.poseLandmarks
+  if (results.poseLandmarks && Array.isArray(results.poseLandmarks) && results.poseLandmarks.length >= 33) {
+    return results.poseLandmarks;
+  }
+
   // Path A: results.results[i].landmarks[0]
   if (results.results && Array.isArray(results.results) && results.results.length > 0) {
     const firstPose = results.results[0];
