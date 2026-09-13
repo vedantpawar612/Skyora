@@ -10,11 +10,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZES, FONTS, SPACING } from '../config/theme';
 import GradientButton from '../components/GradientButton';
 import { formatDuration } from '../utils/helpers';
+import { YOGA_POSES } from '../data/poses';
 
 const { width, height } = Dimensions.get('window');
 
 const VideoPlayerScreen = ({ route, navigation }) => {
-  const { pose } = route.params;
+  const pose = route?.params?.pose || YOGA_POSES[0];
   const videoRef = useRef(null);
   const [status, setStatus] = useState({});
   const [isLoading, setIsLoading] = useState(true);

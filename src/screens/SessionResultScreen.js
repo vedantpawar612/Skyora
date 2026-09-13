@@ -17,7 +17,7 @@ import { saveSessionRecord } from '../services/sessionStorage';
 const { width } = Dimensions.get('window');
 
 const SessionResultScreen = ({ route, navigation }) => {
-  const { sessionReport } = route.params;
+  const sessionReport = route?.params?.sessionReport || null;
   const [isSaved, setIsSaved] = useState(false);
 
   // Auto-save session to history
@@ -30,6 +30,18 @@ const SessionResultScreen = ({ route, navigation }) => {
     }
     return () => { mounted = false; };
   }, [sessionReport]);
+
+  if (!sessionReport) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: SPACING.xl }]}>
+        <Text style={{ color: COLORS.textPrimary, ...FONTS.medium, fontSize: FONT_SIZES.md, marginBottom: SPACING.md }}>
+          No session report found.
+        </Text>
+        <GradientButton title="Go to Library" onPress={() => navigation.navigate('Library')} />
+      </View>
+    );
+  }
+
   const {
     pose,
     avgAccuracy,

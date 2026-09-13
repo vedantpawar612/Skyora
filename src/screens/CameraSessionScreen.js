@@ -39,6 +39,7 @@ import {
 import ttsService from '../services/ttsService';
 import { generateSessionId } from '../utils/helpers';
 import { ROUTES } from '../config/navigation';
+import { YOGA_POSES } from '../data/poses';
 
 // ── Session phases ──
 const PHASE = {
@@ -62,7 +63,7 @@ const STABLE_OPTIONS = STABLE_POSE_CONFIG.options;
 const { width, height } = Dimensions.get('window');
 
 const CameraSessionScreen = ({ route, navigation }) => {
-  const { pose } = route.params;
+  const pose = route?.params?.pose || YOGA_POSES[0];
 
   // Camera permission
   const { hasPermission, requestPermission } = useCameraPermission();

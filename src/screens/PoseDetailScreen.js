@@ -7,13 +7,13 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZES, FONTS, SPACING, SHADOWS } from '../config/theme';
-import { getDifficultyColor } from '../data/poses';
+import { getDifficultyColor, YOGA_POSES } from '../data/poses';
 import GradientButton from '../components/GradientButton';
 
 const { width, height } = Dimensions.get('window');
 
 const PoseDetailScreen = ({ route, navigation }) => {
-  const { pose } = route.params;
+  const pose = route?.params?.pose || YOGA_POSES[0];
   const scrollY = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -21,11 +21,11 @@ const PoseDetailScreen = ({ route, navigation }) => {
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 500,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, []);
 
-  const difficultyColor = getDifficultyColor(pose.level);
+  const difficultyColor = getDifficultyColor(pose?.level || 'Beginner');
 
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 200],
@@ -51,7 +51,7 @@ const PoseDetailScreen = ({ route, navigation }) => {
       <Animated.ScrollView
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
+          { useNativeDriver: Platform.OS !== 'web' }
         )}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
